@@ -1,2 +1,3 @@
 Scrapy
 "fastapi[standard]"
+markdownify
