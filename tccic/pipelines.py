@@ -13,9 +13,10 @@ class TccicPipeline:
     def process_item(self, item, spider):
         html_filename = f"temp/output_{item['url'].split('/')[-2].replace('?','_')}.html"
         mdt_filename = f"temp/output_{item['url'].split('/')[-2].replace('?','_')}.md"
+        
+        Path(html_filename).write_text(item['content'])
 
-        Path(html_filename).write_bytes(item['body'])
-
-        md_text = md(item['text'])
+        md_text = md(item['content'])
         Path(mdt_filename).write_text(md_text)
+        
         return item

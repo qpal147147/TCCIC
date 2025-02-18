@@ -1,0 +1,8 @@
+taishin:
+  bank_name: 台新銀行
+  credit_cards:
+  - card_name: 太陽玫瑰卡
+    url_pattern: ".*cg046.*"
+    xpaths:
+      content: //*[@id="centercontainer"]/div
+  
