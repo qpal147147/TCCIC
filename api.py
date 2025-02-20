@@ -4,30 +4,33 @@ from fastapi.responses import JSONResponse
 import subprocess
 from pydantic import BaseModel
 
+HOST="127.0.0.1"
+PORT=1122
+
 app = FastAPI()
 
-'''
-define pydantic model for request body
-'''
-class UrlRequest(BaseModel):
-    url: str
-
-'''
-define the route for the API
-'''
+# Test connection
 @app.get("/")
 async def welcome():
     return {"Hello World"}
 
 
-@app.post("/start")
-async def start_spider(url: str = Form(...)):
-    if not url:
-        return JSONResponse(content={"status": "error", "msg": "URL is required"}, status_code=400)
+# Crawl specify bank
+@app.post("/crawl")
+async def start_spider(url: str = Form(...), bank: str = Form(...)):
+    if not url or not bank:
+        return JSONResponse(content={"status": "error", "msg": "URL and bank are required"}, status_code=400)
     
-    subprocess.run(['scrapy', 'crawl', 'tccic', '-a', f'url={url}'])
+    subprocess.run(['scrapy', 'crawl', 'tccic', '-a', f'url={url}', '-a', f'bank={bank}'])
     return JSONResponse(content={"status": "success"}, status_code=200) 
+
+
+# Do RAG from crawled data
+@app.post("/rag")
+async def start_spider(url: str = Form(...), bank: str = Form(...)):
+    pass
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=1122)
+    uvicorn.run(app, host=HOST, port=PORT)

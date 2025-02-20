@@ -11,12 +11,14 @@ from markdownify import markdownify as md
 
 class TccicPipeline:
     def process_item(self, item, spider):
-        html_filename = f"temp/output_{item['url'].split('/')[-2].replace('?','_')}.html"
-        mdt_filename = f"temp/output_{item['url'].split('/')[-2].replace('?','_')}.md"
-        
-        Path(html_filename).write_text(item['content'])
+        bake_name = item['bank_name']
+        card_name = item['card_name']
 
-        md_text = md(item['content'])
-        Path(mdt_filename).write_text(md_text)
+        for info in item['info']:
+            filename_base = info['url'].split('/')[-1]
+            mdt_filename = f"temp/output_{bake_name}_{card_name}_{filename_base}.md"
+            
+            md_text = md(info['content'])
+            Path(mdt_filename).write_text(md_text)
         
         return item

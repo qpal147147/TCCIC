@@ -10,6 +10,4 @@ class TccicItem(scrapy.Item):
     # define the fields for your item here like:
     bank_name = scrapy.Field()
     card_name = scrapy.Field()
-    url = scrapy.Field()
-    text = scrapy.Field()
-    content = scrapy.Field()
+    info = scrapy.Field()

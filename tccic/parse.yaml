@@ -4,5 +4,8 @@ taishin:
   - card_name: 太陽玫瑰卡
     url_pattern: ".*cg046.*"
     xpaths:
-      content: //*[@id="centercontainer"]/div
+      content: //*[@id="centercontainer"]/div/div
+      sublinks: //*[@id="ts-comp-41-collapse-1"]/div/div//ul/li/a/@href
+      image:
+      
   
