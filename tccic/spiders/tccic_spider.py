@@ -8,18 +8,18 @@ class TccicSpider(scrapy.Spider):
     name = "tccic"
     config_path = './tccic/parse.yaml'
 
-    def __init__(self, url=None, bank=None, *args, **kwargs):
+    def __init__(self, url=None, bank_code=None, *args, **kwargs):
         super(TccicSpider, self).__init__(*args, **kwargs)
-        if url is None or bank is None:
-            raise ValueError("url or bank is required")
+        if url is None or bank_code is None:
+            raise ValueError("url or bank_code is required")
         
         self.start_urls = [url]
-        self.bank = bank
+        self.bank_code = bank_code
         
         self.config = get_config(self.config_path)
 
     def parse(self, response):
-        bank_config = self.config[self.bank]
+        bank_config = self.config[self.bank_code]
         card_config = get_card_config(bank_config, response.url)
         card_xpaths = card_config['xpaths']
 

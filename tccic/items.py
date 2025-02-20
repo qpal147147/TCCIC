@@ -7,7 +7,11 @@ import scrapy
 
 
 class TccicItem(scrapy.Item):
-    # define the fields for your item here like:
     bank_name = scrapy.Field()
     card_name = scrapy.Field()
     info = scrapy.Field()
+    # info = {
+    #   'url': response.url,
+    #   'text': response.text,
+    #   'content': response.xpath
+    #}
