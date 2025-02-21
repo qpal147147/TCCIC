@@ -18,10 +18,12 @@ class TccicSpider(scrapy.Spider):
         
         self.start_urls = [url]
         self.bank_code = bank_code
-        
         self.config = get_config(self.config_path)
 
     def parse(self, response: HtmlResponse):
+        if response.status != 200:
+            raise ValueError(f"Response status is not 200: {response.status}")
+        
         bank_config = self.config[self.bank_code]
         card_config = get_card_config(bank_config, response.url)
         card_xpaths = card_config['xpaths']

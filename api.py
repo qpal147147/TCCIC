@@ -8,8 +8,18 @@ async def start_spider(url: str, bank_code: str):
     if not url or not bank_code:
         return False
     
-    subprocess.run(['scrapy', 'crawl', 'tccic', '-a', f'url={url}', '-a', f'bank_code={bank_code}'])
-    return True 
+    # Run the Scrapy spider
+    try:
+        result = subprocess.run(
+            ['scrapy', 'crawl', 'tccic', '-a', f'url={url}', '-a', f'bank_code={bank_code}'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred: {e.stderr}")
+        return False
 
 
 app = FastAPI()
