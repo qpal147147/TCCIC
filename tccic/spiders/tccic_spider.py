@@ -1,5 +1,8 @@
-import scrapy
+import base64
 from pathlib import Path
+
+import scrapy
+from scrapy.http.response.html import HtmlResponse
 
 from tccic.items import TccicItem
 from tccic.utils.config_utils import get_config, get_card_config
@@ -18,7 +21,7 @@ class TccicSpider(scrapy.Spider):
         
         self.config = get_config(self.config_path)
 
-    def parse(self, response):
+    def parse(self, response: HtmlResponse):
         bank_config = self.config[self.bank_code]
         card_config = get_card_config(bank_config, response.url)
         card_xpaths = card_config['xpaths']
@@ -52,12 +55,16 @@ class TccicSpider(scrapy.Spider):
         else:
             yield item
         
-        # if main page has image, download it
+        # if main page has image, convert it to base64
         if card_xpaths['image']:
             image_url = response.xpath(card_xpaths['image']).get()
-            yield response.follow(image_url, self.download_image)
+            yield response.follow(
+                image_url, 
+                self.parse_image_to_base64,
+                meta={'item': item}
+            )
 
-    def parse_subpage(self, response):
+    def parse_subpage(self, response: HtmlResponse):
         item = response.meta['item']
         card_xpaths = response.meta['card_xpaths']
         
@@ -70,12 +77,15 @@ class TccicSpider(scrapy.Spider):
 
         yield item
 
-    def download_image(self, response):
-        ROOT = Path('images')
-        ROOT.mkdir(exist_ok=True, parents=True)
-        
-        image_name = response.url.split("/")[-1]
-        image_path = ROOT / image_name
+    def parse_image_to_base64(self, response: HtmlResponse):
+        item = response.meta['item']
 
-        with open(image_path, 'wb') as f:
-            f.write(response.body)
+        image_data = response.body
+        image_base64 = base64.b64encode(image_data).decode("utf-8")
+        image_info = {
+            'url': response.url,
+            'text': response.text,
+            'content': image_base64
+        }
+        item['info'].append(image_info)
+        return item
