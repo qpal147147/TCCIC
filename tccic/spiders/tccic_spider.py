@@ -1,15 +1,14 @@
 import base64
-from pathlib import Path
 
 import scrapy
 from scrapy.http.response.html import HtmlResponse
 
 from tccic.items import TccicItem
-from tccic.utils.config_utils import get_config, get_card_config
+from utils.config_utils import get_config, get_card_config
 
 class TccicSpider(scrapy.Spider):
     name = "tccic"
-    config_path = './tccic/parse.yaml'
+    config_path = './parse.yaml'
 
     def __init__(self, url=None, bank_code=None, *args, **kwargs):
         super(TccicSpider, self).__init__(*args, **kwargs)
