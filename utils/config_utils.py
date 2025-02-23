@@ -15,3 +15,11 @@ def get_card_config(bank_config, url):
         if url_pattern and re.match(url_pattern, url):
             return card
     return None
+
+def get_bank_and_card_name(config_path, bank_code, url):
+    bank_config = get_config(config_path)[bank_code]
+    card_config = get_card_config(bank_config, url)
+    if not card_config:
+        return None, None
+    
+    return bank_config['bank_name'], card_config['card_name']

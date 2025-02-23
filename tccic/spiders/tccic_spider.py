@@ -8,7 +8,7 @@ from utils.config_utils import get_config, get_card_config
 
 class TccicSpider(scrapy.Spider):
     name = "tccic"
-    config_path = './parse.yaml'
+    config_path = './card.yaml'
 
     def __init__(self, url=None, bank_code=None, *args, **kwargs):
         super(TccicSpider, self).__init__(*args, **kwargs)
@@ -25,10 +25,10 @@ class TccicSpider(scrapy.Spider):
         
         bank_config = self.config[self.bank_code]
         card_config = get_card_config(bank_config, response.url)
-        card_xpaths = card_config['xpaths']
-
         if card_config is None:
             raise ValueError(f"Card not found for {response.url}")
+        
+        card_xpaths = card_config['xpaths']
         
         # init item object
         item = TccicItem()

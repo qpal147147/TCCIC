@@ -1,7 +1,12 @@
+import subprocess
 from typing import Union
+
 from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
-import subprocess
+
+from utils.config_utils import get_bank_and_card_name
+
+config_path = './card.yaml'
 
 # Crawl specify bank
 async def start_spider(url: str, bank_code: str):
@@ -37,7 +42,12 @@ async def start_rag(url: str = Form(...), bank_code: str = Form(...)):
     if not spider_status:
         return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
-    return JSONResponse(content={"status": "success", "data": "RAG"}, status_code=200)
+
+    bank_name, card_name = get_bank_and_card_name(config_path, bank_code, url)
+    if not bank_name or not card_name:
+        return JSONResponse(content={"status": "error", "msg": "No bank or card found."}, status_code=400)
+    
+    return JSONResponse(content={"status": "success", "data": {"bank": bank_name, "card": card_name}}, status_code=200)
 
 
 if __name__ == "__main__":
