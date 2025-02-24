@@ -4,7 +4,7 @@ import scrapy
 from scrapy.http.response.html import HtmlResponse
 
 from tccic.items import TccicItem
-from utils.config_utils import get_config, get_card_config
+from utils.config_utils import get_config, get_bank_config, get_card_config
 
 class TccicSpider(scrapy.Spider):
     name = "tccic"
@@ -23,7 +23,7 @@ class TccicSpider(scrapy.Spider):
         if response.status != 200:
             raise ValueError(f"Response status is not 200: {response.status}")
         
-        bank_config = self.config[self.bank_code]
+        bank_config = get_bank_config(self.config, self.bank_code)
         card_config = get_card_config(bank_config, response.url)
         if card_config is None:
             raise ValueError(f"Card not found for {response.url}")
