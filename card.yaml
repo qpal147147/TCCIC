@@ -7,10 +7,10 @@ banks:
         xpaths:
           content: //*[@id="centercontainer"]/div/div
           sublinks: //*[@id="ts-comp-41-collapse-1"]/div/div//ul/li/a/@href
-          image: null
+          image:  # If the image contains information, please add it
       - card_name: FlyGo卡
         url_pattern: ".*flygo.*"
         xpaths:
           content: //*[@id="centercontainer"]/div/div
           sublinks: //*[@id="ts-comp-41-collapse-1"]/div/div//ul/li/a/@href
-          image: null
+          image: 

@@ -51,7 +51,9 @@ async def start_rag(url: str = Form(...), bank_code: str = Form(...)):
             return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
     # do rag
-    response = RAG(json_path).complete()
+    rag = RAG(json_path)
+    embedding_flag = rag.embedding()
+    response = rag.complete()
     
     return JSONResponse(content={"status": "success", "data": {"bank": bank_name, "card": card_name}}, status_code=200)
 
@@ -62,6 +64,11 @@ async def recrawl(url: str = Form(...), bank_code: str = Form(...)):
     if not spider_status:
         return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
+    # do embedding
+    bank_name, card_name = get_bank_and_card_name(config_path, bank_code, url)
+    json_path = f"./json_data/{bank_name}/{card_name}/data.json"
+    RAG(json_path).embedding()
+
     return JSONResponse(content={"status": "success", "msg": "Recrawl Successfully"}, status_code=200)
 
 
