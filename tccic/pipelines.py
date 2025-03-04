@@ -44,7 +44,7 @@ class TccicPipeline:
             self.processed_urls.add(info['url'])
         
         # Save the JSON data to a file
-        output_dir = Path('json_data') / bank_name / card_name
+        output_dir = Path('data') / bank_name / card_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
         output_file = output_dir / 'data.json'

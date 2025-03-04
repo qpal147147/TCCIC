@@ -36,15 +36,15 @@ async def welcome():
     return {"Hello World"}
 
 
-@app.post("/rag")
-async def start_rag(url: str = Form(...), bank_code: str = Form(...)):
+@app.post("/llm")
+async def start_llm(url: str = Form(...), bank_code: str = Form(...)):
     # get bank and card name
     bank_name, card_name = get_bank_and_card_name(config_path, bank_code, url)
     if not bank_name or not card_name:
         return JSONResponse(content={"status": "error", "msg": "No bank or card found."}, status_code=400)
     
     # check if json file exists
-    json_path = f"./json_data/{bank_name}/{card_name}/data.json"
+    json_path = f"./data/{bank_name}/{card_name}/data.json"
     if not Path(json_path).exists():
         spider_status = await start_spider(url, bank_code)
         if not spider_status:
@@ -52,10 +52,9 @@ async def start_rag(url: str = Form(...), bank_code: str = Form(...)):
     
     # do rag
     rag = RAG(json_path)
-    embedding_flag = rag.embedding()
-    response = rag.complete()
+    rag.complete("這張卡名叫甚麼?")
     
-    return JSONResponse(content={"status": "success", "data": {"bank": bank_name, "card": card_name}}, status_code=200)
+    return JSONResponse(content={"status": "success", "msg": {"bank": bank_name, "card": card_name}}, status_code=200)
 
 
 @app.post("/recrawl")
