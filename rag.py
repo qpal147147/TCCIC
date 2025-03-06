@@ -58,17 +58,41 @@ class RAG():
         
 
     def complete(self, query):
+        # define return data
+        json_data = {
+            "bank": self.bank_name,
+            "card": self.card_name,
+            "last_update": self.last_update,
+            "source_data": [],
+            "response": "",
+        }
+
+        # check if json file exists
         if not Path(self.lancedb_path).exists():
             print(f"Path '{self.lancedb_path}' does not exist, so automatically embedding.")
             embedding_flag = self.embedding()
             if not embedding_flag:
-                return f"Error during embedding process."
+                json_data["response"] = "Error during embedding process."
         
+        # check if table exists
         vector_store = LanceDBVectorStore(uri=self.lancedb_path)
         if not vector_store._table_exists("vectors"):
-            return f"Table 'vectors' does not exist."
+            json_data["response"] = "Table 'vectors' does not exist."
         
+        # load data from vector store
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
         query_engine = index.as_query_engine()
         response = query_engine.query(query)
-        print(response)
+
+        # format response
+        json_data["source_data"] += [
+            {
+                "text": source_node.node.text, 
+                "score": source_node.score,
+                "url": source_node.metadata['url'],
+            } 
+            for source_node in response.source_nodes
+        ]
+        json_data["response"] = response.response
+
+        return json_data

@@ -52,9 +52,9 @@ async def start_llm(url: str = Form(...), bank_code: str = Form(...)):
     
     # do rag
     rag = RAG(json_path)
-    rag.complete("這張卡名叫甚麼?")
+    json_data = rag.complete("信用卡的最高回饋額度是多少?")
     
-    return JSONResponse(content={"status": "success", "msg": {"bank": bank_name, "card": card_name}}, status_code=200)
+    return JSONResponse(content={"status": "success", "msg": json_data}, status_code=200)
 
 
 @app.post("/recrawl")
