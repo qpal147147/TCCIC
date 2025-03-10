@@ -1,8 +1,10 @@
 Scrapy
 "fastapi[standard]"
 markdownify
+python-dotenv
 llama-index-core
 llama-index-readers-file
 llama-index-llms-ollama
+llama-index-llms-gemini
 llama-index-embeddings-huggingface
 llama-index-vector-stores-lancedb

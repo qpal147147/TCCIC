@@ -3,13 +3,15 @@ import uuid
 from pathlib import Path
 
 from markdownify import markdownify as md
+from dotenv import load_dotenv
 from llama_index.core import Document, StorageContext
 from llama_index.core import Settings
 from llama_index.core import VectorStoreIndex
-from llama_index.core.node_parser import HTMLNodeParser, MarkdownNodeParser
+from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.ollama import Ollama
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
+from llama_index.llms.ollama import Ollama
+from llama_index.llms.gemini import Gemini
 
 class RAG():
     def __init__(self, json_path: str):
@@ -18,7 +20,10 @@ class RAG():
         self.card_name = self.json_data['card']
         self.last_update = self.json_data['data']
 
-        Settings.llm = Ollama(model="cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_s", request_timeout=120.0)
+        load_dotenv()
+
+        # Settings.llm = Ollama(model="cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_s", request_timeout=300.0)
+        Settings.llm = Gemini(model="models/gemini-2.0-flash-lite")
         Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-large")
 
         self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
@@ -34,18 +39,18 @@ class RAG():
     
     def embedding(self):
         try:
-            parser = HTMLNodeParser()
-            # parser = MarkdownNodeParser()
+            md_parser = MarkdownNodeParser()
             pages = self.json_data['pages']
 
             docs = []
             for page in pages:
-                # md_text = md(page['html_content'])
-                doc = Document(text=page['html_content'], extra_info={'url': page['url']}, id_=str(uuid.uuid4()))
+                md_text = md(page['html_content'], strip=['a'])
+
+                doc = Document(text=md_text, extra_info={'url': page['url']}, id_=str(uuid.uuid4()))
                 docs.append(doc)
 
-            nodes = parser.get_nodes_from_documents(docs, show_progress=True)
-
+            nodes = md_parser.get_nodes_from_documents(docs, show_progress=True)
+            
             # create vector store and save index
             vector_store = LanceDBVectorStore(uri=self.lancedb_path, mode="overwrite")
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
