@@ -19,14 +19,14 @@ class RAG():
         self.bank_name = self.json_data['bank']
         self.card_name = self.json_data['card']
         self.last_update = self.json_data['data']
+        self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
 
         load_dotenv()
 
-        # Settings.llm = Ollama(model="cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_s", request_timeout=300.0)
+        # create models
         Settings.llm = Gemini(model="models/gemini-2.0-flash-lite")
+        # Settings.llm = Ollama(model="cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_s", request_timeout=300.0)
         Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-large")
-
-        self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
 
     def load_json(self, json_path: str):
         try:        
@@ -44,11 +44,16 @@ class RAG():
 
             docs = []
             for page in pages:
-                md_text = md(page['html_content'], strip=['a'])
-
-                doc = Document(text=md_text, extra_info={'url': page['url']}, id_=str(uuid.uuid4()))
+                md_text = md(page['html_content'], strip=['a', 'img'])
+                doc = Document(
+                    text=md_text, 
+                    extra_info={'url': page['url']}, 
+                    excluded_llm_metadata_keys=["url"],
+                    excluded_embed_metadata_keys = ["url"],
+                    id_=str(uuid.uuid4()),
+                )
                 docs.append(doc)
-
+                
             nodes = md_parser.get_nodes_from_documents(docs, show_progress=True)
             
             # create vector store and save index
@@ -57,8 +62,8 @@ class RAG():
             index = VectorStoreIndex(nodes, storage_context=storage_context, show_progress=True)
 
             return True
-        except:
-            print("Error during embedding process.")
+        except Exception as e:
+            print(f"Error during embedding process. Error:\n{e}")
             return False
         
 
@@ -78,21 +83,23 @@ class RAG():
             embedding_flag = self.embedding()
             if not embedding_flag:
                 json_data["response"] = "Error during embedding process."
-        
+                return json_data
+
         # check if table exists
         vector_store = LanceDBVectorStore(uri=self.lancedb_path)
         if not vector_store._table_exists("vectors"):
             json_data["response"] = "Table 'vectors' does not exist."
+            return json_data
         
         # load data from vector store
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
-        query_engine = index.as_query_engine()
+        query_engine = index.as_query_engine(similarity_top_k=2)
         response = query_engine.query(query)
 
         # format response
         json_data["source_data"] += [
             {
-                "text": source_node.node.text, 
+                # "text": source_node.node.text, 
                 "score": source_node.score,
                 "url": source_node.metadata['url'],
             } 

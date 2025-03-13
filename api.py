@@ -37,7 +37,7 @@ async def welcome():
 
 
 @app.post("/llm")
-async def start_llm(url: str = Form(...), bank_code: str = Form(...)):
+async def start_llm(url: str = Form(...), bank_code: str = Form(...), query: str = Form(...)):
     # get bank and card name
     bank_name, card_name = get_bank_and_card_name(config_path, bank_code, url)
     if not bank_name or not card_name:
@@ -52,7 +52,7 @@ async def start_llm(url: str = Form(...), bank_code: str = Form(...)):
     
     # do rag
     rag = RAG(json_path)
-    json_data = rag.complete("信用卡的最高回饋額度是多少?")
+    json_data = rag.complete(query)
     
     return JSONResponse(content={"status": "success", "msg": json_data}, status_code=200)
 
