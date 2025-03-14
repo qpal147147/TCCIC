@@ -1,3 +1,4 @@
+import os
 import json
 import uuid
 from pathlib import Path
@@ -33,7 +34,7 @@ class RAG():
         # create models
         Settings.llm = Gemini(model="models/gemini-2.0-flash-lite", temperature=0.5)
         # Settings.llm = Ollama(model="cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_s", request_timeout=300.0)
-        Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-large")
+        Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-large", token=os.getenv("HF_TOKEN"))
 
     def load_json(self, json_path: str):
         try:        

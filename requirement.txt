@@ -1,10 +1,14 @@
+# crawler
 Scrapy
-"fastapi[standard]"
-markdownify
-python-dotenv
+
+# RAG
 llama-index-core
-llama-index-readers-file
+llama-index-vector-stores-lancedb
 llama-index-llms-ollama
 llama-index-llms-gemini
 llama-index-embeddings-huggingface
-llama-index-vector-stores-lancedb
+
+# general
+"fastapi[standard]"
+markdownify
+python-dotenv

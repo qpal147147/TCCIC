@@ -25,3 +25,5 @@ Taiwan Credit Card Information Crawler (TCCIC) API
     >Sometimes the simplest solution is the best. If your knowledge base is smaller than 200,000 tokens (about 500 pages of material), you can just include the entire knowledge base in the prompt that you give the model, with no need for RAG or similar methods.
 
 5. Base on point 4, use LLM to summarize the content of each page and embed the original text in metadata. Besides avoiding additional noise, it also obtains the original text to improve the accuracy of the query stage.
+
+6. The summary text length is limited to 500 characters, because the embedding model allows a maximum of 512 tokens.
