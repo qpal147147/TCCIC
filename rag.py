@@ -15,12 +15,18 @@ from llama_index.llms.ollama import Ollama
 from llama_index.llms.gemini import Gemini
 
 class RAG():
-    def __init__(self, json_path: str):
+    def __init__(self, json_path: str, llm: str, embedding: str, temperature: float):
+        load_dotenv()
+
         self.json_data = self.load_json(json_path)
         self.bank_name = self.json_data['bank']
         self.card_name = self.json_data['card']
         self.last_update = self.json_data['data']
         self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
+
+        self.llm = llm
+        self.embedding = embedding
+        self.temperature = temperature
         self._prompt = """
         以下為文章內容，請總結此篇文章的內容，並限制500字以內。不要使用"總結如下"等開頭，回傳總結的文字內容就好。
 
@@ -28,13 +34,10 @@ class RAG():
 
         {content}
         """
-
-        load_dotenv()
-
-        # create models
-        Settings.llm = Gemini(model="models/gemini-2.0-flash-lite", temperature=0.5)
-        # Settings.llm = Ollama(model="cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_s", request_timeout=300.0)
-        Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-large", token=os.getenv("HF_TOKEN"))
+        
+        Settings.llm = Gemini(model=self.llm, temperature=self.temperature)
+        # Settings.llm = Ollama(model=self.llm, request_timeout=300.0)
+        Settings.embed_model = HuggingFaceEmbedding(model_name=self.embedding, token=os.getenv("HF_TOKEN"))
 
     def load_json(self, json_path: str):
         try:        
@@ -45,7 +48,7 @@ class RAG():
             print(f"File not found: {self.json_path}")
             return None
     
-    def embedding(self):
+    def embed_text(self):
         try:
             # md_parser = MarkdownNodeParser()
             parser = SimpleFileNodeParser()
@@ -94,7 +97,7 @@ class RAG():
         # check if json file exists
         if not Path(self.lancedb_path).exists():
             print(f"Path '{self.lancedb_path}' does not exist, so automatically embedding.")
-            embedding_flag = self.embedding()
+            embedding_flag = self.embed_text()
             if not embedding_flag:
                 json_data["response"] = "Error during embedding process."
                 return json_data

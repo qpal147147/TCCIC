@@ -5,10 +5,14 @@ from pathlib import Path
 from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
 
-from utils.config_utils import get_bank_and_card_name
+from utils.config_utils import get_bank_and_card_name, get_llm_config, get_embedding_config
 from rag import RAG
 
-config_path = './card.yaml'
+CARD_CONFIG_PATH = './config/card.yaml'
+MODEL_CONFIG_PATH = './config/model.yaml'
+
+llm_cfg = get_llm_config(MODEL_CONFIG_PATH, "gemini")
+embedding_cfg = get_embedding_config(MODEL_CONFIG_PATH, "huggingFace")
 
 # Crawl specify bank
 async def start_spider(url: str, bank_code: str):
@@ -18,7 +22,7 @@ async def start_spider(url: str, bank_code: str):
     # Run the Scrapy spider
     try:
         result = subprocess.run(
-            ['scrapy', 'crawl', 'tccic', '-a', f'url={url}', '-a', f'bank_code={bank_code}'],
+            ['scrapy', 'crawl', 'tccic', '-a', f'url={url}', '-a', f'bank_code={bank_code}', '-a', f'config={CARD_CONFIG_PATH}'],
             capture_output=True,
             text=True,
             check=True
@@ -39,7 +43,7 @@ async def welcome():
 @app.post("/llm")
 async def start_llm(url: str = Form(...), bank_code: str = Form(...), query: str = Form(...)):
     # get bank and card name
-    bank_name, card_name = get_bank_and_card_name(config_path, bank_code, url)
+    bank_name, card_name = get_bank_and_card_name(CARD_CONFIG_PATH, bank_code, url)
     if not bank_name or not card_name:
         return JSONResponse(content={"status": "error", "msg": "No bank or card found."}, status_code=400)
     
@@ -51,7 +55,7 @@ async def start_llm(url: str = Form(...), bank_code: str = Form(...), query: str
             return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
     # do rag
-    rag = RAG(json_path)
+    rag = RAG(json_path, llm_cfg["model"], embedding_cfg["model"], llm_cfg["temperature"])
     json_data = rag.complete(query)
     
     return JSONResponse(content={"status": "success", "msg": json_data}, status_code=200)
@@ -64,16 +68,16 @@ async def recrawl(url: str = Form(...), bank_code: str = Form(...)):
         return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
     # do embedding
-    bank_name, card_name = get_bank_and_card_name(config_path, bank_code, url)
-    json_path = f"./json_data/{bank_name}/{card_name}/data.json"
-    RAG(json_path).embedding()
+    bank_name, card_name = get_bank_and_card_name(CARD_CONFIG_PATH, bank_code, url)
+    json_path = f"./data/{bank_name}/{card_name}/data.json"
+    RAG(json_path, llm_cfg["model"], embedding_cfg["model"], llm_cfg["temperature"]).embed_text()
 
     return JSONResponse(content={"status": "success", "msg": "Recrawl Successfully"}, status_code=200)
 
 
 @app.post("/clean")
 async def clean():
-    data_folder = Path("./json_data")
+    data_folder = Path("./data")
     if data_folder.exists():
         shutil.rmtree(data_folder)
     data_folder.mkdir(parents=True, exist_ok=True)

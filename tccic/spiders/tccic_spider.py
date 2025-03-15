@@ -8,16 +8,15 @@ from utils.config_utils import get_config, get_bank_config, get_card_config
 
 class TccicSpider(scrapy.Spider):
     name = "tccic"
-    config_path = './card.yaml'
 
-    def __init__(self, url=None, bank_code=None, *args, **kwargs):
+    def __init__(self, url=None, bank_code=None, config=None, *args, **kwargs):
         super(TccicSpider, self).__init__(*args, **kwargs)
         if url is None or bank_code is None:
             raise ValueError("url or bank_code is required")
         
         self.start_urls = [url]
         self.bank_code = bank_code
-        self.config = get_config(self.config_path)
+        self.config = get_config(config)
 
     def parse(self, response: HtmlResponse):
         if response.status != 200:

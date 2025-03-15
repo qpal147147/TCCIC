@@ -29,3 +29,20 @@ def get_bank_and_card_name(config_path, bank_code, url):
         return None, None
     
     return bank_config['bank_name'], card_config['card_name']
+
+def get_model_config(config_path, platform):
+    return get_config(config_path)[platform]
+
+def get_llm_config(config_path, platform):
+    config = get_config(config_path)[platform]
+    if not config:
+        return None
+    
+    return config["llm"]
+
+def get_embedding_config(config_path, platform):
+    config = get_config(config_path)[platform]
+    if not config:
+        return None
+    
+    return config["embedding"]

@@ -9,8 +9,8 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Return source information when using RAG
 - [x] Gemini flash 2.0
 - [x] Improve RAG accuracy 
-- [ ] HuggingFace severless api for embedding model
-- [ ] Model yaml
+- [x] HuggingFace severless api for embedding model
+- [x] Model yaml
 - [ ] Parse base64 image from html information
 
 ## Note

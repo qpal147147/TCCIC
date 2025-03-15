@@ -1,0 +1,27 @@
+openai:
+  llm:
+    model: gpt-4o
+    temperature: 0.5
+  embedding:
+    model: text-embedding-3-large
+
+gemini:
+  llm:
+    model: models/gemini-2.0-flash-lite # only supports text
+    temperature: 0.5
+  embedding:
+    model: models/text-embedding-004  # only supports English
+
+huggingFace:
+  llm:
+    model: Qwen/Qwen2.5-VL-7B-Instruct
+    temperature: 0.5
+  embedding:
+    model: intfloat/multilingual-e5-large
+
+ollama:
+  llm:
+    model: cwchang/llama3-taide-lx-8b-chat-alpha1:q4_k_s
+    temperature: 0.5
+  embedding:
+    model: bge-m3
