@@ -22,7 +22,10 @@ class RAG():
         self.bank_name = self.json_data['bank']
         self.card_name = self.json_data['card']
         self.last_update = self.json_data['data']
+
+        self.md_dir = f"./data/{self.bank_name}/{self.card_name}/mdfiles"
         self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
+        Path(self.md_dir).mkdir(parents=True, exist_ok=True)
 
         self.llm = llm
         self.embedding = embedding
@@ -45,7 +48,7 @@ class RAG():
                 data = json.load(f)
             return data
         except FileNotFoundError:
-            print(f"File not found: {self.json_path}")
+            print(f"File not found: {json_path}")
             return None
     
     def embed_text(self):
@@ -55,10 +58,11 @@ class RAG():
             pages = self.json_data['pages']
 
             docs = []
-            for page in pages:
+            for i, page in enumerate(pages):
                 md_text = md(page['html_content'], strip=['a', 'img'])
-                response = Settings.llm.complete(self._prompt.format(content=md_text))
+                Path(f"{self.md_dir}/page_{i+1}.md").write_text(md_text)
 
+                response = Settings.llm.complete(self._prompt.format(content=md_text))
                 doc = Document(
                     text=response.text, 
                     extra_info={

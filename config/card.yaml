@@ -14,3 +14,13 @@ banks:
           content: //*[@id="centercontainer"]/div/div
           sublinks: //*[@id="ts-comp-41-collapse-1"]/div/div//ul/li/a/@href
           image: 
+  
+  - bank_code: cathaybk
+    bank_name: 國泰世華銀行
+    credit_cards:
+      - card_name: CUBE卡
+        url_pattern: ".*CUBE.*"
+        xpaths:
+          content: /html/body/div/main/article
+          sublinks: 
+          image:  # If the image contains information, please add it
