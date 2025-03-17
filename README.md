@@ -2,6 +2,7 @@
 Taiwan Credit Card Information Crawler (TCCIC) API
 
 ## TO DO
+### v1.0.0
 - [x] Add Ollama LLM and HuggingFace embedding model
 - [x] Fix yaml key error
 - [x] Add RAG embedding function
@@ -11,7 +12,13 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Improve RAG accuracy 
 - [x] HuggingFace severless api for embedding model
 - [x] Model yaml
-- [ ] Parse base64 image from html information
+
+### v2.0.0
+- [ ] Smarter crawlers
+    - [ ] A simpler, more extensible, and more maintainable crawler template(card.yaml)
+    - [ ] Modify the JSON data saving method
+- [ ] Modify the RAG encoding method
+- [ ] Hybrid search
 
 ## Note
 1. Using RecursiveTextSplitter to split text, but not accurately including the relationship between paragraphs.
