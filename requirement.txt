@@ -1,3 +1,5 @@
+# python >= 3.10
+
 # crawler
 Scrapy
 
@@ -9,6 +11,7 @@ llama-index-llms-gemini
 llama-index-embeddings-huggingface
 
 # general
-"fastapi[standard]"
+fastapi[standard]
 markdownify
 python-dotenv
+pandas
