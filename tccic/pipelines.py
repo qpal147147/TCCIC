@@ -16,7 +16,7 @@ class TccicPipeline:
         self.json_data = {
             'bank': '',
             'card': '',
-            'data': datetime.now().strftime("%Y/%m/%d"),
+            'date': datetime.now().strftime("%Y/%m/%d"),
             'pages': [],
         }
 
@@ -37,7 +37,6 @@ class TccicPipeline:
             
             self.json_data['pages'].append({
                 'url': info['url'],
-                # 'all_text': info['text'],
                 'html_content': info['content']
             })
 

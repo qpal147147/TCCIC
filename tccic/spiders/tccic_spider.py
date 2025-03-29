@@ -1,20 +1,21 @@
 import base64
 
 import scrapy
+from scrapy import Selector
 from scrapy.http.response.html import HtmlResponse
 
 from tccic.items import TccicItem
-from utils.config_utils import get_config, get_bank_config, get_card_config
-
+from utils.config_utils import get_config, get_bank_config
 class TccicSpider(scrapy.Spider):
     name = "tccic"
 
-    def __init__(self, url=None, bank_code=None, config=None, *args, **kwargs):
+    def __init__(self, url=None, card_name=None, bank_code=None, config=None, *args, **kwargs):
         super(TccicSpider, self).__init__(*args, **kwargs)
-        if url is None or bank_code is None:
-            raise ValueError("url or bank_code is required")
+        if url is None or card_name is None or bank_code is None:
+            raise ValueError("url or card_name or bank_code is required")
         
         self.start_urls = [url]
+        self.card_name = card_name
         self.bank_code = bank_code
         self.config = get_config(config)
 
@@ -23,69 +24,69 @@ class TccicSpider(scrapy.Spider):
             raise ValueError(f"Response status is not 200: {response.status}")
         
         bank_config = get_bank_config(self.config, self.bank_code)
-        card_config = get_card_config(bank_config, response.url)
-        if card_config is None:
-            raise ValueError(f"Card not found for {response.url}")
-        
-        card_xpaths = card_config['xpaths']
+        if bank_config is None:
+            raise ValueError(f"Bank config not found for bank code: {self.bank_code}")
         
         # init item object
         item = TccicItem()
         item['bank_name'] = bank_config['bank_name']
-        item['card_name'] = card_config['card_name']
+        item['card_name'] = self.card_name
         item['info'] = []
 
-        # main page content
+        content_xpaths = bank_config['content_xpath']
+ 
+        # searching for valid xpaths 
+        content = ""
+        for xpath in content_xpaths:
+            content = response.xpath(xpath).get(default="")
+            if content:
+                break
+        
+        if not content:
+            raise ValueError(f"Content not found for xpaths")
+        
+        # save main page content
         main_info = {
             'url': response.url,
-            'text': response.text,
-            'content': response.xpath(card_xpaths['content']).get()
+            'content': content
         }
         item['info'].append(main_info)
 
-        # sub page content
-        if card_xpaths['sublinks']:
-            sublinks = response.xpath(card_xpaths['sublinks']).getall()
-            for sublink in sublinks:
+        # get all sublinks from main page
+        selector = Selector(text=content)
+        sublinks = selector.xpath('//a/@href').getall()
+
+        # get subpage content
+        for sublink in sublinks:
+            if not sublink.startswith("javascript"):
                 yield response.follow(
                     sublink, 
                     self.parse_subpage,
-                    meta={'item': item, 'card_xpaths': card_xpaths}
+                    meta={'item': item, 'content_xpaths': content_xpaths}
                 )
-        else:
-            yield item
-        
-        # if main page has image, convert it to base64
-        if card_xpaths['image']:
-            image_url = response.xpath(card_xpaths['image']).get()
-            yield response.follow(
-                image_url, 
-                self.parse_image_to_base64,
-                meta={'item': item}
-            )
+
+        yield item
 
     def parse_subpage(self, response: HtmlResponse):
         item = response.meta['item']
-        card_xpaths = response.meta['card_xpaths']
+        content_xpaths = response.meta['content_xpaths']
         
+        # searching for valid xpaths 
+        content = ""
+        for xpath in content_xpaths:
+            content = response.xpath(xpath).get(default="")
+            if content:
+                break
+        
+        if not content:
+            self.logger.warning(f"Empty content in {response.url}")
+            return
+        
+        # save subpage content 
         subpage_info = {
             'url': response.url,
-            'text': response.text,
-            'content': response.xpath(card_xpaths['content']).get()
+            'content': content
         }
         item['info'].append(subpage_info)
 
         yield item
-
-    def parse_image_to_base64(self, response: HtmlResponse):
-        item = response.meta['item']
-
-        image_data = response.body
-        image_base64 = base64.b64encode(image_data).decode("utf-8")
-        image_info = {
-            'url': response.url,
-            'text': response.text,
-            'content': image_base64
-        }
-        item['info'].append(image_info)
-        return item

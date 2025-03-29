@@ -1,26 +1,10 @@
 banks:
   - bank_code: taishin
     bank_name: 台新銀行
-    credit_cards:
-      - card_name: 太陽玫瑰卡
-        url_pattern: ".*cg046.*"
-        xpaths:
-          content: //*[@id="centercontainer"]/div/div
-          sublinks: //*[@id="ts-comp-41-collapse-1"]/div/div//ul/li/a/@href
-          image:  # If the image contains information, please add it
-      - card_name: FlyGo卡
-        url_pattern: ".*flygo.*"
-        xpaths:
-          content: //*[@id="centercontainer"]/div/div
-          sublinks: //*[@id="ts-comp-41-collapse-1"]/div/div//ul/li/a/@href
-          image: 
+    content_xpath:    # If necessary, add more xpath to avoid matching without results
+      - //*[@id="centercontainer"]/div/div
   
   - bank_code: cathaybk
     bank_name: 國泰世華銀行
-    credit_cards:
-      - card_name: CUBE卡
-        url_pattern: ".*CUBE.*"
-        xpaths:
-          content: /html/body/div/main/article
-          sublinks: 
-          image:  # If the image contains information, please add it
+    content_xpath: 
+      - /html/body/div[1]/main/article
