@@ -9,7 +9,9 @@ def get_config(config_path):
         config = yaml.load(f, Loader=yaml.SafeLoader)
     return config
 
-def get_bank_config(config, bank_code):
+def get_bank_config(config_path, bank_code):
+    config = get_config(config_path)
+    
     for bank_config in config['banks']:
         if bank_config['bank_code'] == bank_code:
             return bank_config

@@ -2,7 +2,7 @@ banks:
   - bank_code: taishin
     bank_name: 台新銀行
     content_xpath:    # If necessary, add more xpath to avoid matching without results
-      - //*[@id="centercontainer"]/div/div
+      - //*[@id="centercontainer"]/div
   
   - bank_code: cathaybk
     bank_name: 國泰世華銀行

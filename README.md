@@ -17,7 +17,10 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Smarter crawlers
     - [x] A simpler, more extensible, and more maintainable crawler template(card.yaml)
     - [x] Modify the JSON data saving method
-- [ ] Modify the RAG encoding method
+- [x] Modify the RAG encoding method
+- [x] Logger
+- [ ] Contextual retrieval
+- [ ] BM25
 - [ ] Hybrid search
 
 ## Note

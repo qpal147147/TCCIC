@@ -1,11 +1,11 @@
-import base64
-
 import scrapy
 from scrapy import Selector
 from scrapy.http.response.html import HtmlResponse
 
 from tccic.items import TccicItem
-from utils.config_utils import get_config, get_bank_config
+from utils.config_utils import get_bank_config
+
+
 class TccicSpider(scrapy.Spider):
     name = "tccic"
 
@@ -17,23 +17,22 @@ class TccicSpider(scrapy.Spider):
         self.start_urls = [url]
         self.card_name = card_name
         self.bank_code = bank_code
-        self.config = get_config(config)
+        self.bank_config = get_bank_config(config, self.bank_code)
 
     def parse(self, response: HtmlResponse):
         if response.status != 200:
             raise ValueError(f"Response status is not 200: {response.status}")
         
-        bank_config = get_bank_config(self.config, self.bank_code)
-        if bank_config is None:
+        if self.bank_config is None:
             raise ValueError(f"Bank config not found for bank code: {self.bank_code}")
         
         # init item object
         item = TccicItem()
-        item['bank_name'] = bank_config['bank_name']
+        item['bank_name'] = self.bank_config['bank_name']
         item['card_name'] = self.card_name
         item['info'] = []
 
-        content_xpaths = bank_config['content_xpath']
+        content_xpaths = self.bank_config['content_xpath']
  
         # searching for valid xpaths 
         content = ""
@@ -43,7 +42,7 @@ class TccicSpider(scrapy.Spider):
                 break
         
         if not content:
-            raise ValueError(f"Content not found for xpaths")
+            raise ValueError(f"The xpath content cannot be found, please check your bank code or xpath.")
         
         # save main page content
         main_info = {
@@ -55,6 +54,7 @@ class TccicSpider(scrapy.Spider):
         # get all sublinks from main page
         selector = Selector(text=content)
         sublinks = selector.xpath('//a/@href').getall()
+        self.logger.info(f"Found {len(sublinks)} sublinks in {response.url}")
 
         # get subpage content
         for sublink in sublinks:
