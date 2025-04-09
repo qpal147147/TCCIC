@@ -1,6 +1,7 @@
 import scrapy
 from scrapy import Selector
 from scrapy.http.response.html import HtmlResponse
+from twisted.internet.error import DNSLookupError, TimeoutError, TCPTimedOutError
 
 from tccic.items import TccicItem
 from utils.config_utils import get_bank_config
@@ -62,6 +63,7 @@ class TccicSpider(scrapy.Spider):
                 yield response.follow(
                     sublink, 
                     self.parse_subpage,
+                    errback=self.errback_httpbin,
                     meta={'item': item, 'content_xpaths': content_xpaths}
                 )
 
@@ -90,3 +92,9 @@ class TccicSpider(scrapy.Spider):
         item['info'].append(subpage_info)
 
         yield item
+
+    def errback_httpbin(self, failure):
+        url = failure.request.url
+        err_msg = failure.getErrorMessage()
+
+        self.logger.error(f"{err_msg} <GET {url}>")
