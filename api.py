@@ -71,10 +71,10 @@ async def start_llm(url: str = Form(...), card_name: str = Form(...), bank_code:
             return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
     # do rag
-    # rag = RAG(json_path, llm_cfg["model"], embedding_cfg["model"], llm_cfg["temperature"])
-    # json_data = rag.complete(query)
+    rag = RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"])
+    json_data = rag.complete(query)
     
-    return JSONResponse(content={"status": "success", "msg": 'json_data'}, status_code=200)
+    return JSONResponse(content={"status": "success", "msg": json_data}, status_code=200)
 
 
 @app.post("/recrawl")
@@ -84,9 +84,9 @@ async def recrawl(url: str = Form(...), card_name: str = Form(...), bank_code: s
         return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
     # do embedding
-    # bank_name, card_name = get_bank_and_card_name(CARD_CONFIG_PATH, bank_code, url)
-    # json_path = f"./data/{bank_name}/{card_name}/data.json"
-    # RAG(json_path, llm_cfg["model"], embedding_cfg["model"], llm_cfg["temperature"]).embed_text()
+    bank_name = get_bank_config(CARD_CONFIG_PATH, bank_code)['bank_name']
+    json_path = f"./data/{bank_name}/{card_name}/data.json"
+    RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"]).embed_text()
 
     return JSONResponse(content={"status": "success", "msg": "Recrawl Successfully"}, status_code=200)
 

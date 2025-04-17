@@ -1,27 +1,31 @@
 import os
 import json
 import uuid
+import re
+import time
 from pathlib import Path
+from typing import List
+from tqdm import tqdm
 
 from markdownify import markdownify as md
 from dotenv import load_dotenv
 from llama_index.core import Document, StorageContext
 from llama_index.core import Settings
 from llama_index.core import VectorStoreIndex
-from llama_index.core.node_parser import MarkdownNodeParser, SimpleFileNodeParser
+from llama_index.core.node_parser import MarkdownNodeParser, SimpleFileNodeParser, SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.gemini import Gemini
 
 class RAG():
-    def __init__(self, json_path: str, llm: str, embedding: str, temperature: float):
+    def __init__(self, json_path: str, llm: str, temperature: float, embedding: str):
         load_dotenv()
 
         self.json_data = self.load_json(json_path)
         self.bank_name = self.json_data['bank']
         self.card_name = self.json_data['card']
-        self.last_update = self.json_data['data']
+        self.last_update = self.json_data['date']
 
         self.md_dir = f"./data/{self.bank_name}/{self.card_name}/mdfiles"
         self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
@@ -31,14 +35,20 @@ class RAG():
         self.embedding = embedding
         self.temperature = temperature
         self._prompt = """
-        以下為文章內容，請總結此篇文章的內容，並限制500字以內。不要使用"總結如下"等開頭，回傳總結的文字內容就好。
+        以下是整個文檔的內容:
+        <document>
+        {WHOLE_DOCUMENT}
+        </document>
 
-        文章內容:
+        以下是文檔中的一個chunk(段落):
+        <chunk>
+        {CHUNK_CONTENT}
+        </chunk>
 
-        {content}
+        請給出一個短而簡潔的上下文，說明這個chunk(段落)在整個文檔中的位置或意義。僅回答上下文摘要，無需其他內容。
         """
         
-        Settings.llm = Gemini(model=self.llm, temperature=self.temperature)
+        Settings.llm = Gemini(api_key=os.getenv("GOOGLE_API_KEY"), model=self.llm, temperature=self.temperature)
         # Settings.llm = Ollama(model=self.llm, request_timeout=300.0)
         Settings.embed_model = HuggingFaceEmbedding(model_name=self.embedding, token=os.getenv("HF_TOKEN"))
 
@@ -53,32 +63,52 @@ class RAG():
     
     def embed_text(self):
         try:
-            # md_parser = MarkdownNodeParser()
-            parser = SimpleFileNodeParser()
+            sentence_splitter = SentenceSplitter(
+                chunk_size=512, 
+                chunk_overlap=128, 
+                paragraph_separator="\n\n",
+                secondary_chunking_regex="[^,.;。？！]+[,.;。？！]?",
+                separator=" "
+            )
             pages = self.json_data['pages']
 
+            # create md files and split into chunks
             docs = []
-            for i, page in enumerate(pages):
+            for i, page in enumerate(pages, start=1):
                 md_text = md(page['html_content'], strip=['a', 'img'])
-                Path(f"{self.md_dir}/page_{i+1}.md").write_text(md_text)
+                Path(f"{self.md_dir}/page_{i}.md").write_text(md_text)
 
-                response = Settings.llm.complete(self._prompt.format(content=md_text))
                 doc = Document(
-                    text=response.text, 
+                    text=md_text, 
                     extra_info={
                         'url': page['url'],
-                        'original_text': md_text,
-                    }, 
-                    excluded_llm_metadata_keys=["url"],
-                    excluded_embed_metadata_keys = ["url", "original_text"],
+                        'whole_content': md_text,
+                        'original_content': "",
+                        'contextualized_content': ""
+                    },
+                    excluded_llm_metadata_keys=["url", "whole_content", "original_content", "contextualized_content"],
+                    excluded_embed_metadata_keys = ["url", "whole_content", "original_content", "contextualized_content"],
                     id_=str(uuid.uuid4()),
                 )
                 docs.append(doc)
+
+            nodes = sentence_splitter.get_nodes_from_documents(docs, show_progress=True)
+
+            # create context for each chunk
+            for node in tqdm(nodes, desc="Creating context for each chunk"):
+                whole_document = node.metadata['whole_content']
+                chunk_content = node.get_content()
+                response = Settings.llm.complete(self._prompt.format(WHOLE_DOCUMENT=whole_document, CHUNK_CONTENT=chunk_content))
                 
-            nodes = parser.get_nodes_from_documents(docs, show_progress=True)
+                # update node metadata
+                node.metadata['original_content'] = chunk_content
+                node.metadata['contextualized_content'] = response.text
+                node.set_content(f"{response.text}\n\n{chunk_content}")
+
+                time.sleep(1.1) # avoid rate limit. Gemini: 30RPM
             
             # create vector store and save index
-            vector_store = LanceDBVectorStore(uri=self.lancedb_path, mode="overwrite")
+            vector_store = LanceDBVectorStore(uri=self.lancedb_path, table_name="vectors", mode="overwrite")
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
             index = VectorStoreIndex(nodes, storage_context=storage_context, show_progress=True)
 
@@ -89,7 +119,7 @@ class RAG():
         
 
     def complete(self, query):
-        # define return data
+        # define return structure
         json_data = {
             "bank": self.bank_name,
             "card": self.card_name,
@@ -98,7 +128,7 @@ class RAG():
             "response": "",
         }
 
-        # check if json file exists
+        # check if the vector file exists
         if not Path(self.lancedb_path).exists():
             print(f"Path '{self.lancedb_path}' does not exist, so automatically embedding.")
             embedding_flag = self.embed_text()
@@ -114,15 +144,14 @@ class RAG():
         
         # load data from vector store
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
-        query_engine = index.as_query_engine(similarity_top_k=2)
+        query_engine = index.as_query_engine(similarity_top_k=20)
         response = query_engine.query(query)
 
-        # format response
+        # add source data to response
         json_data["source_data"] += [
             {
-                "text": source_node.node.text,
+                "text": source_node.node.get_content(),
                 "score": source_node.score,
-                # "source_text": source_node.metadata['original_text'],
                 "url": source_node.metadata['url'],
             } 
             for source_node in response.source_nodes
