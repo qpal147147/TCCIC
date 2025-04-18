@@ -20,7 +20,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Modify the RAG encoding method
 - [x] Crawler Logger
 - [x] Contextual retrieval
-- [ ] LLM Logger
+- [x] LLM Logger
 - [ ] BM25
 - [ ] Hybrid search
 

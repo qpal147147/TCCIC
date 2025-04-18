@@ -3,6 +3,7 @@ import json
 import uuid
 import re
 import time
+import logging
 from pathlib import Path
 from typing import List
 from tqdm import tqdm
@@ -19,18 +20,28 @@ from llama_index.llms.ollama import Ollama
 from llama_index.llms.gemini import Gemini
 
 class RAG():
-    def __init__(self, json_path: str, llm: str, temperature: float, embedding: str):
+    def __init__(self, json_path: str, llm: str, temperature: float, embedding: str, logger: logging.Logger = None):
         load_dotenv()
 
+        # Logger
+        if logger is None:
+            self.logger = logging.getLogger("null_logger")
+            self.logger.handlers = [logging.NullHandler()]
+        else:
+            self.logger = logger
+
+        # load json data
         self.json_data = self.load_json(json_path)
         self.bank_name = self.json_data['bank']
         self.card_name = self.json_data['card']
-        self.last_update = self.json_data['date']
+        self.last_update = self.json_data['date'] 
 
+        # set data path
         self.md_dir = f"./data/{self.bank_name}/{self.card_name}/mdfiles"
         self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
         Path(self.md_dir).mkdir(parents=True, exist_ok=True)
 
+        # set llm and embedding
         self.llm = llm
         self.embedding = embedding
         self.temperature = temperature
@@ -53,13 +64,14 @@ class RAG():
         Settings.embed_model = HuggingFaceEmbedding(model_name=self.embedding, token=os.getenv("HF_TOKEN"))
 
     def load_json(self, json_path: str):
-        try:        
+        try:
+            self.logger.info(f"Loading JSON from {json_path}")
+
             with open(json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return data
         except FileNotFoundError:
-            print(f"File not found: {json_path}")
-            return None
+            raise Exception(f"The {json_path} file is not found")
     
     def embed_text(self):
         try:
@@ -73,6 +85,8 @@ class RAG():
             pages = self.json_data['pages']
 
             # create md files and split into chunks
+            self.logger.info(f"Find {len(pages)} pages and start to split into chunks...")
+
             docs = []
             for i, page in enumerate(pages, start=1):
                 md_text = md(page['html_content'], strip=['a', 'img'])
@@ -95,6 +109,8 @@ class RAG():
             nodes = sentence_splitter.get_nodes_from_documents(docs, show_progress=True)
 
             # create context for each chunk
+            self.logger.info(f"Find {len(nodes)} chunks and start to create context for each chunk...")
+
             for node in tqdm(nodes, desc="Creating context for each chunk"):
                 whole_document = node.metadata['whole_content']
                 chunk_content = node.get_content()
@@ -108,13 +124,19 @@ class RAG():
                 time.sleep(1.1) # avoid rate limit. Gemini: 30RPM
             
             # create vector store and save index
-            vector_store = LanceDBVectorStore(uri=self.lancedb_path, table_name="vectors", mode="overwrite")
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
-            index = VectorStoreIndex(nodes, storage_context=storage_context, show_progress=True)
+            if nodes:
+                self.logger.info(f"Start to create vector store...")
 
+                vector_store = LanceDBVectorStore(uri=self.lancedb_path, table_name="vectors", mode="overwrite")
+                storage_context = StorageContext.from_defaults(vector_store=vector_store)
+                index = VectorStoreIndex(nodes, storage_context=storage_context, show_progress=True)
+            else:
+                raise Exception("No nodes found, so no vector store created.")
+
+            self.logger.info(f"Vector store created successfully.")
             return True
         except Exception as e:
-            print(f"Error during embedding process. Error:\n{e}")
+            self.logger.error(f"Error during embedding process. Error:\n{e}")
             return False
         
 
@@ -130,15 +152,20 @@ class RAG():
 
         # check if the vector file exists
         if not Path(self.lancedb_path).exists():
-            print(f"Path '{self.lancedb_path}' does not exist, so automatically embedding.")
+            self.logger.error(f"Path '{self.lancedb_path}' does not exist, so automatically embedding.")
+
             embedding_flag = self.embed_text()
             if not embedding_flag:
                 json_data["response"] = "Error during embedding process."
                 return json_data
 
         # check if table exists
+        self.logger.info(f"Loading vector data from {self.lancedb_path}")
+
         vector_store = LanceDBVectorStore(uri=self.lancedb_path)
         if not vector_store._table_exists("vectors"):
+            self.logger.error("Table 'vectors' does not exist.")
+
             json_data["response"] = "Table 'vectors' does not exist."
             return json_data
         

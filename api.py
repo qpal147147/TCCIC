@@ -12,7 +12,7 @@ from rag import RAG
 
 # set up logging
 logger_crawler = setup_logger("app.crawler", "crawler.log")
-logger_analyzer = setup_logger("app.llm", "llm.log")
+logger_rag = setup_logger("app.rag", "llm.log")
 
 # set config path
 CARD_CONFIG_PATH = './config/card.yaml'
@@ -58,9 +58,12 @@ async def welcome():
 
 @app.post("/llm")
 async def start_llm(url: str = Form(...), card_name: str = Form(...), bank_code: str = Form(...), query: str = Form(...)):
+    logger_rag.info(f"Start LLM with url: {url}, card_name: {card_name}, bank_code: {bank_code}")
+
     # get bank and card name
     bank_name = get_bank_config(CARD_CONFIG_PATH, bank_code)['bank_name']
     if not bank_name:
+        logger_rag.error(f"The {bank_code} not found.")
         return JSONResponse(content={"status": "error", "msg": f"The {bank_code} not found."}, status_code=400)
     
     # check if json file exists
@@ -68,11 +71,16 @@ async def start_llm(url: str = Form(...), card_name: str = Form(...), bank_code:
     if not Path(json_path).exists():
         spider_status = await start_spider(url, card_name, bank_code)
         if not spider_status:
+            logger_rag.error("An error occurred during the crawl.")
             return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
     # do rag
-    rag = RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"])
-    json_data = rag.complete(query)
+    try:
+        rag = RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"], logger_rag)
+        json_data = rag.complete(query)
+        logger_rag.info(f"Query Successfully.")
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "msg": f"An error occurred during the RAG: {e}"}, status_code=400)
     
     return JSONResponse(content={"status": "success", "msg": json_data}, status_code=200)
 
@@ -84,9 +92,12 @@ async def recrawl(url: str = Form(...), card_name: str = Form(...), bank_code: s
         return JSONResponse(content={"status": "error", "msg": "An error occurred during the crawl."}, status_code=400)
     
     # do embedding
-    bank_name = get_bank_config(CARD_CONFIG_PATH, bank_code)['bank_name']
-    json_path = f"./data/{bank_name}/{card_name}/data.json"
-    RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"]).embed_text()
+    try:
+        bank_name = get_bank_config(CARD_CONFIG_PATH, bank_code)['bank_name']
+        json_path = f"./data/{bank_name}/{card_name}/data.json"
+        RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"], logger_rag).embed_text()
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "msg": f"An error occurred during the RAG: {e}"}, status_code=400)
 
     return JSONResponse(content={"status": "success", "msg": "Recrawl Successfully"}, status_code=200)
 
