@@ -7,7 +7,9 @@ import logging
 from pathlib import Path
 from typing import List
 from tqdm import tqdm
+from enum import Enum
 
+import jieba
 from markdownify import markdownify as md
 from dotenv import load_dotenv
 from llama_index.core import Document, StorageContext
@@ -18,6 +20,14 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.gemini import Gemini
+from llama_index.retrievers.bm25 import BM25Retriever
+
+
+class SearchType(Enum):
+    VECTOR = "vector"
+    BM25 = "bm25"
+    HYBRID = "hybrid"
+
 
 class RAG():
     def __init__(self, json_path: str, llm: str, temperature: float, embedding: str, logger: logging.Logger = None):
@@ -38,7 +48,7 @@ class RAG():
 
         # set data path
         self.md_dir = f"./data/{self.bank_name}/{self.card_name}/mdfiles"
-        self.lancedb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
+        self.vectordb_path = f"./data/{self.bank_name}/{self.card_name}/lancedb"
         Path(self.md_dir).mkdir(parents=True, exist_ok=True)
 
         # set llm and embedding
@@ -127,7 +137,7 @@ class RAG():
             if nodes:
                 self.logger.info(f"Start to create vector store...")
 
-                vector_store = LanceDBVectorStore(uri=self.lancedb_path, table_name="vectors", mode="overwrite")
+                vector_store = LanceDBVectorStore(uri=self.vectordb_path, table_name="vectors", mode="overwrite")
                 storage_context = StorageContext.from_defaults(vector_store=vector_store)
                 index = VectorStoreIndex(nodes, storage_context=storage_context, show_progress=True)
             else:
@@ -140,7 +150,7 @@ class RAG():
             return False
         
 
-    def complete(self, query):
+    def complete(self, query: str, topk: int = 20, search_type: SearchType = SearchType.VECTOR):
         # define return structure
         json_data = {
             "bank": self.bank_name,
@@ -151,8 +161,8 @@ class RAG():
         }
 
         # check if the vector file exists
-        if not Path(self.lancedb_path).exists():
-            self.logger.error(f"Path '{self.lancedb_path}' does not exist, so automatically embedding.")
+        if not Path(self.vectordb_path).exists():
+            self.logger.error(f"Path '{self.vectordb_path}' does not exist, so automatically embedding.")
 
             embedding_flag = self.embed_text()
             if not embedding_flag:
@@ -160,29 +170,43 @@ class RAG():
                 return json_data
 
         # check if table exists
-        self.logger.info(f"Loading vector data from {self.lancedb_path}")
+        self.logger.info(f"Loading vector data from {self.vectordb_path}")
 
-        vector_store = LanceDBVectorStore(uri=self.lancedb_path)
+        vector_store = LanceDBVectorStore(uri=self.vectordb_path)
         if not vector_store._table_exists("vectors"):
             self.logger.error("Table 'vectors' does not exist.")
 
             json_data["response"] = "Table 'vectors' does not exist."
             return json_data
         
-        # load data from vector store
-        index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
-        query_engine = index.as_query_engine(similarity_top_k=20)
-        response = query_engine.query(query)
+        if search_type == SearchType.VECTOR:
+            self.logger.info(f"Search type: Vector search.")
 
-        # add source data to response
-        json_data["source_data"] += [
-            {
-                "text": source_node.node.get_content(),
-                "score": source_node.score,
-                "url": source_node.metadata['url'],
-            } 
-            for source_node in response.source_nodes
-        ]
-        json_data["response"] = response.response
+            # load data from vector store
+            index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+            query_engine = index.as_query_engine(similarity_top_k=topk)
+            response = query_engine.query(query)
+
+            # add source data to response
+            json_data["source_data"] += [
+                {
+                    "text": source_node.node.get_content(),
+                    "score": source_node.score,
+                    "url": source_node.metadata['url'],
+                } 
+                for source_node in response.source_nodes
+            ]
+            json_data["response"] = response.response
+        
+        elif search_type == SearchType.BM25:
+            self.logger.info(f"Search type: BM25 search.")
+            ...
+        
+        elif search_type == SearchType.HYBRID:
+            self.logger.info(f"Search type: Hybrid search.")
+            ...
+        
+        else:
+            json_data["response"] = "Invalid search type."
 
         return json_data

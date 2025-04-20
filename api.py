@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from utils.config_utils import get_bank_config, get_llm_config, get_embedding_config
 from utils.logger import setup_logger
-from rag import RAG
+from rag import RAG, SearchType
 
 
 # set up logging
@@ -77,7 +77,7 @@ async def start_llm(url: str = Form(...), card_name: str = Form(...), bank_code:
     # do rag
     try:
         rag = RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"], logger_rag)
-        json_data = rag.complete(query)
+        json_data = rag.complete(query, search_type=SearchType.VECTOR)
         logger_rag.info(f"Query Successfully.")
     except Exception as e:
         return JSONResponse(content={"status": "error", "msg": f"An error occurred during the RAG: {e}"}, status_code=400)

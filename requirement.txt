@@ -9,9 +9,11 @@ llama-index-vector-stores-lancedb
 llama-index-llms-ollama
 llama-index-llms-gemini
 llama-index-embeddings-huggingface
+llama-index-retrievers-bm25
 
 # general
 fastapi[standard]
 markdownify
+jieba
 python-dotenv
 pandas
