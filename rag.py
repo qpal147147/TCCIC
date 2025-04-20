@@ -73,6 +73,9 @@ class RAG():
         # Settings.llm = Ollama(model=self.llm, request_timeout=300.0)
         Settings.embed_model = HuggingFaceEmbedding(model_name=self.embedding, token=os.getenv("HF_TOKEN"))
 
+    def chinese_tokenizer(self, text: str) -> List[str]:
+        return list(jieba.cut(text))
+    
     def load_json(self, json_path: str):
         try:
             self.logger.info(f"Loading JSON from {json_path}")
@@ -179,11 +182,11 @@ class RAG():
             json_data["response"] = "Table 'vectors' does not exist."
             return json_data
         
+        index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
         if search_type == SearchType.VECTOR:
             self.logger.info(f"Search type: Vector search.")
 
             # load data from vector store
-            index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
             query_engine = index.as_query_engine(similarity_top_k=topk)
             response = query_engine.query(query)
 
@@ -200,8 +203,30 @@ class RAG():
         
         elif search_type == SearchType.BM25:
             self.logger.info(f"Search type: BM25 search.")
-            ...
-        
+
+            # get all nodes from index
+            retriever = index.as_retriever(similarity_top_k=10000)
+            source_nodes = retriever.retrieve("dummy query")
+            nodes = [x.node for x in source_nodes]
+
+            # create bm25 retriever and execute query
+            bm25_retriever = BM25Retriever.from_defaults(
+                nodes=nodes,
+                similarity_top_k=topk,
+                tokenizer=self.chinese_tokenizer,
+            )
+            retrieved_nodes = bm25_retriever.retrieve(query)
+
+            # add source data to response
+            json_data["source_data"] += [
+                {
+                    "text": node.node.get_content(),
+                    "score": node.score,
+                    "url": node.metadata['url'],
+                } 
+                for node in retrieved_nodes
+            ]
+
         elif search_type == SearchType.HYBRID:
             self.logger.info(f"Search type: Hybrid search.")
             ...
