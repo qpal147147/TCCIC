@@ -58,7 +58,7 @@ async def welcome():
 
 @app.post("/llm")
 async def start_llm(url: str = Form(...), card_name: str = Form(...), bank_code: str = Form(...), query: str = Form(...)):
-    logger_rag.info(f"Start LLM with url: {url}, card_name: {card_name}, bank_code: {bank_code}")
+    logger_rag.info(f"Start LLM with url: {url}, card_name: {card_name}, bank_code: {bank_code}, query: {query}")
 
     # get bank and card name
     bank_name = get_bank_config(CARD_CONFIG_PATH, bank_code)['bank_name']
@@ -77,7 +77,7 @@ async def start_llm(url: str = Form(...), card_name: str = Form(...), bank_code:
     # do rag
     try:
         rag = RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"], logger_rag)
-        json_data = rag.complete(query, search_type=SearchType.VECTOR)
+        json_data = rag.complete(query, topk=20, search_type=SearchType.HYBRID)
         logger_rag.info(f"Query Successfully.")
     except Exception as e:
         return JSONResponse(content={"status": "error", "msg": f"An error occurred during the RAG: {e}"}, status_code=400)

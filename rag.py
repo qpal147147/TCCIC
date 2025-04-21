@@ -16,6 +16,8 @@ from llama_index.core import Document, StorageContext
 from llama_index.core import Settings
 from llama_index.core import VectorStoreIndex
 from llama_index.core.node_parser import MarkdownNodeParser, SimpleFileNodeParser, SentenceSplitter
+from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from llama_index.llms.ollama import Ollama
@@ -189,17 +191,6 @@ class RAG():
             # load data from vector store
             query_engine = index.as_query_engine(similarity_top_k=topk)
             response = query_engine.query(query)
-
-            # add source data to response
-            json_data["source_data"] += [
-                {
-                    "text": source_node.node.get_content(),
-                    "score": source_node.score,
-                    "url": source_node.metadata['url'],
-                } 
-                for source_node in response.source_nodes
-            ]
-            json_data["response"] = response.response
         
         elif search_type == SearchType.BM25:
             self.logger.info(f"Search type: BM25 search.")
@@ -215,23 +206,50 @@ class RAG():
                 similarity_top_k=topk,
                 tokenizer=self.chinese_tokenizer,
             )
-            retrieved_nodes = bm25_retriever.retrieve(query)
-
-            # add source data to response
-            json_data["source_data"] += [
-                {
-                    "text": node.node.get_content(),
-                    "score": node.score,
-                    "url": node.metadata['url'],
-                } 
-                for node in retrieved_nodes
-            ]
+            query_engine = RetrieverQueryEngine.from_args(bm25_retriever)
+            response = query_engine.query(query)
 
         elif search_type == SearchType.HYBRID:
             self.logger.info(f"Search type: Hybrid search.")
-            ...
+            
+            # get all nodes from index
+            source_nodes = index.as_retriever(similarity_top_k=10000).retrieve("dummy query")
+            nodes = [x.node for x in source_nodes]
+
+            # create vector and bm25 retriever
+            vector_retriever = index.as_retriever(similarity_top_k=topk)
+            bm25_retriever = BM25Retriever.from_defaults(
+                nodes=nodes,
+                similarity_top_k=topk,
+                tokenizer=self.chinese_tokenizer,
+            )
+
+            # combine retrievers and execute query
+            hybrid_retriever = QueryFusionRetriever(
+                [vector_retriever, bm25_retriever],
+                retriever_weights=[0.6, 0.4],
+                similarity_top_k=topk,
+                num_queries=1, # set this to 1 to disable query generation
+                mode="relative_score",
+                use_async=False,
+                verbose=True,
+            )
+            query_engine = RetrieverQueryEngine.from_args(hybrid_retriever)
+            response = query_engine.query(query)
         
         else:
             json_data["response"] = "Invalid search type."
+            return json_data
+
+        # add source data to response
+        json_data["source_data"] += [
+            {
+                "text": source_node.node.get_content(),
+                "score": source_node.score,
+                "url": source_node.metadata['url'],
+            } 
+            for source_node in response.source_nodes
+        ]
+        json_data["response"] = response.response
 
         return json_data

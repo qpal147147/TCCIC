@@ -21,7 +21,8 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Logger
 - [x] Contextual retrieval
 - [x] BM25
-- [ ] Hybrid search
+- [x] Hybrid search
+- [ ] Improve RAG accuracy
 
 ## Note
 1. Using RecursiveTextSplitter to split text, but not accurately including the relationship between paragraphs.
