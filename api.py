@@ -77,9 +77,10 @@ async def start_llm(url: str = Form(...), card_name: str = Form(...), bank_code:
     # do rag
     try:
         rag = RAG(json_path, llm_cfg["model"], llm_cfg["temperature"], embedding_cfg["model"], logger_rag)
-        json_data = rag.complete(query, topk=20, search_type=SearchType.HYBRID)
+        json_data = rag.complete(query, topk=20, search_type=SearchType.HYBRID, reanker=True)
         logger_rag.info(f"Query Successfully.")
     except Exception as e:
+        logger_rag.info(f"Query failed.")
         return JSONResponse(content={"status": "error", "msg": f"An error occurred during the RAG: {e}"}, status_code=400)
     
     return JSONResponse(content={"status": "success", "msg": json_data}, status_code=200)

@@ -18,6 +18,7 @@ from llama_index.core import VectorStoreIndex
 from llama_index.core.node_parser import MarkdownNodeParser, SimpleFileNodeParser, SentenceSplitter
 from llama_index.core.retrievers import QueryFusionRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
+from llama_index.core.postprocessor import SentenceTransformerRerank
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from llama_index.llms.ollama import Ollama
@@ -54,9 +55,11 @@ class RAG():
         Path(self.md_dir).mkdir(parents=True, exist_ok=True)
 
         # set llm and embedding
-        self.llm = llm
-        self.embedding = embedding
-        self.temperature = temperature
+        self.renaker = SentenceTransformerRerank(model="BAAI/bge-reranker-v2-m3")
+        Settings.llm = Gemini(api_key=os.getenv("GOOGLE_API_KEY"), model=llm, temperature=temperature)
+        # Settings.llm = Ollama(model=self.llm, request_timeout=300.0)
+        Settings.embed_model = HuggingFaceEmbedding(model_name=embedding, token=os.getenv("HF_TOKEN"))
+
         self._prompt = """
         以下是整個文檔的內容:
         <document>
@@ -71,9 +74,6 @@ class RAG():
         請給出一個短而簡潔的上下文，說明這個chunk(段落)在整個文檔中的位置或意義。僅回答上下文摘要，無需其他內容。
         """
         
-        Settings.llm = Gemini(api_key=os.getenv("GOOGLE_API_KEY"), model=self.llm, temperature=self.temperature)
-        # Settings.llm = Ollama(model=self.llm, request_timeout=300.0)
-        Settings.embed_model = HuggingFaceEmbedding(model_name=self.embedding, token=os.getenv("HF_TOKEN"))
 
     def chinese_tokenizer(self, text: str) -> List[str]:
         return list(jieba.cut(text))
@@ -155,7 +155,7 @@ class RAG():
             return False
         
 
-    def complete(self, query: str, topk: int = 20, search_type: SearchType = SearchType.VECTOR):
+    def complete(self, query: str, topk: int = 20, search_type: SearchType = SearchType.VECTOR, reanker: bool = False):
         # define return structure
         json_data = {
             "bank": self.bank_name,
@@ -184,13 +184,19 @@ class RAG():
             json_data["response"] = "Table 'vectors' does not exist."
             return json_data
         
+        if reanker:
+            self.logger.info(f"Reanker enabled.")
+            self.renaker.top_n = topk
+            topk = topk * 2
+
         index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
         if search_type == SearchType.VECTOR:
             self.logger.info(f"Search type: Vector search.")
 
-            # load data from vector store
-            query_engine = index.as_query_engine(similarity_top_k=topk)
-            response = query_engine.query(query)
+            query_engine = index.as_query_engine(
+                similarity_top_k=topk,
+                node_postprocessors=[self.renaker] if reanker else None,
+            )
         
         elif search_type == SearchType.BM25:
             self.logger.info(f"Search type: BM25 search.")
@@ -200,14 +206,16 @@ class RAG():
             source_nodes = retriever.retrieve("dummy query")
             nodes = [x.node for x in source_nodes]
 
-            # create bm25 retriever and execute query
+            # create bm25 retriever
             bm25_retriever = BM25Retriever.from_defaults(
                 nodes=nodes,
                 similarity_top_k=topk,
                 tokenizer=self.chinese_tokenizer,
             )
-            query_engine = RetrieverQueryEngine.from_args(bm25_retriever)
-            response = query_engine.query(query)
+            query_engine = RetrieverQueryEngine.from_args(
+                bm25_retriever,
+                node_postprocessors=[self.renaker] if reanker else None,
+            )
 
         elif search_type == SearchType.HYBRID:
             self.logger.info(f"Search type: Hybrid search.")
@@ -224,7 +232,7 @@ class RAG():
                 tokenizer=self.chinese_tokenizer,
             )
 
-            # combine retrievers and execute query
+            # combine retrievers
             hybrid_retriever = QueryFusionRetriever(
                 [vector_retriever, bm25_retriever],
                 retriever_weights=[0.6, 0.4],
@@ -234,18 +242,24 @@ class RAG():
                 use_async=False,
                 verbose=True,
             )
-            query_engine = RetrieverQueryEngine.from_args(hybrid_retriever)
-            response = query_engine.query(query)
+
+            query_engine = RetrieverQueryEngine.from_args(
+                hybrid_retriever,
+                node_postprocessors=[self.renaker] if reanker else None,
+            )
         
         else:
             json_data["response"] = "Invalid search type."
             return json_data
 
+        # execute query
+        response = query_engine.query(query)
+
         # add source data to response
         json_data["source_data"] += [
             {
                 "text": source_node.node.get_content(),
-                "score": source_node.score,
+                "score": float(source_node.score),  # np.float32 -> float
                 "url": source_node.metadata['url'],
             } 
             for source_node in response.source_nodes

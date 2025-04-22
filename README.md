@@ -22,6 +22,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Contextual retrieval
 - [x] BM25
 - [x] Hybrid search
+- [x] Reranker
 - [ ] Improve RAG accuracy
 
 ## Note
