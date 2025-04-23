@@ -12,10 +12,8 @@ from enum import Enum
 import jieba
 from markdownify import markdownify as md
 from dotenv import load_dotenv
-from llama_index.core import Document, StorageContext
-from llama_index.core import Settings
-from llama_index.core import VectorStoreIndex
-from llama_index.core.node_parser import MarkdownNodeParser, SimpleFileNodeParser, SentenceSplitter
+from llama_index.core import Document, StorageContext, VectorStoreIndex, Settings
+from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.retrievers import QueryFusionRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import SentenceTransformerRerank
@@ -136,7 +134,7 @@ class RAG():
                 node.metadata['contextualized_content'] = response.text
                 node.set_content(f"{response.text}\n\n{chunk_content}")
 
-                time.sleep(1.1) # avoid rate limit. Gemini: 30RPM
+                time.sleep(1.5) # avoid rate limit. Gemini: 30RPM
             
             # create vector store and save index
             if nodes:
