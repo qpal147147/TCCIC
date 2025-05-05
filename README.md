@@ -25,3 +25,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Reranker
 - [x] Support image crawling
 
+### v3.0.0
+- [] Remove the llama-index framework
+- [] Customize llm package
+- [] Support image retrieval
