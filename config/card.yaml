@@ -1,3 +1,7 @@
+image:
+  height: 600
+  width: 600
+
 banks:
   - bank_code: taishin
     bank_name: 台新銀行

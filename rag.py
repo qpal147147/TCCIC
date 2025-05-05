@@ -1,7 +1,7 @@
 import os
 import json
 import uuid
-import re
+import base64
 import time
 import logging
 from pathlib import Path
@@ -17,10 +17,12 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.retrievers import QueryFusionRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import SentenceTransformerRerank
+from llama_index.core.schema import ImageDocument
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.gemini import Gemini
+from llama_index.multi_modal_llms.gemini import GeminiMultiModal
 from llama_index.retrievers.bm25 import BM25Retriever
 
 
@@ -99,25 +101,30 @@ class RAG():
 
             # create md files and split into chunks
             self.logger.info(f"Find {len(pages)} pages and start to split into chunks...")
-
+            
             docs = []
+            b64_images = []
             for i, page in enumerate(pages, start=1):
-                md_text = md(page['html_content'], strip=['a', 'img'])
-                Path(f"{self.md_dir}/page_{i}.md").write_text(md_text)
+                try:
+                    base64.b64decode(page['html_content'], validate=True)
+                    b64_images.append(page['html_content'])
+                except:
+                    md_text = md(page['html_content'], strip=['a', 'img'])
+                    Path(f"{self.md_dir}/page_{i}.md").write_text(md_text)
 
-                doc = Document(
-                    text=md_text, 
-                    extra_info={
-                        'url': page['url'],
-                        'whole_content': md_text,
-                        'original_content': "",
-                        'contextualized_content': ""
-                    },
-                    excluded_llm_metadata_keys=["url", "whole_content", "original_content", "contextualized_content"],
-                    excluded_embed_metadata_keys = ["url", "whole_content", "original_content", "contextualized_content"],
-                    id_=str(uuid.uuid4()),
-                )
-                docs.append(doc)
+                    doc = Document(
+                        text=md_text, 
+                        extra_info={
+                            'url': page['url'],
+                            'whole_content': md_text,
+                            'original_content': "",
+                            'contextualized_content': ""
+                        },
+                        excluded_llm_metadata_keys=["url", "whole_content", "original_content", "contextualized_content"],
+                        excluded_embed_metadata_keys = ["url", "whole_content", "original_content", "contextualized_content"],
+                        id_=str(uuid.uuid4()),
+                    )
+                    docs.append(doc)
 
             nodes = sentence_splitter.get_nodes_from_documents(docs, show_progress=True)
 
@@ -136,6 +143,12 @@ class RAG():
 
                 time.sleep(1.5) # avoid rate limit. Gemini: 30RPM
             
+            # prcoess image doucments
+            self.logger.info(f"Find {len(b64_images)} images from pages and start to process...")
+
+            for b64_img in b64_images:
+                pass
+
             # create vector store and save index
             if nodes:
                 self.logger.info(f"Start to create vector store...")
