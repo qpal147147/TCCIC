@@ -6,8 +6,8 @@ from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
 
 from utils.config_utils import get_bank_config, get_llm_config, get_embedding_config
-from utils.logger import setup_logger
-from rag import RAG, SearchType
+from utils.logger_setup import setup_logger
+from rag_handler.rag import RAG, SearchType
 
 
 # set up logging

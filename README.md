@@ -26,6 +26,8 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Support image crawling
 
 ### v3.0.0
-- [] Remove the llama-index framework
-- [] Customize llm package
-- [] Support image retrieval
+- [x] Refactor project structure, Make it more modular
+- [ ] Make crawlers more automated and reduce excessive parameter settings
+- [ ] Support image retrieval
+- [ ] Customize llm package
+- [ ] Remove the llama-index framework

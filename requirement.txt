@@ -1,20 +1,10 @@
-# python >= 3.10
+# python >= 3.11
 
 # crawler
 Scrapy
 
 # RAG
-llama-index-core==0.10.68
-llama-index-vector-stores-lancedb==0.1.7
-llama-index-llms-ollama==0.2.2
-llama-index-llms-gemini==0.2.0
-llama-index-embeddings-huggingface==0.2.3
-llama-index-retrievers-bm25==0.1.5
-llama-index-multi-modal-llms-gemini==0.2.0
 
 # general
-fastapi[standard]
-markdownify
-jieba
-python-dotenv
-pandas
+pydantic-settings
+pytest
