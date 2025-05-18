@@ -9,5 +9,6 @@ class CardsItem(scrapy.Item):
     """
     CardsItem
     """
+    bank_name = scrapy.Field()
     title = scrapy.Field()
     url = scrapy.Field()

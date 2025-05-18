@@ -15,11 +15,25 @@ class CardSpider(scrapy.Spider):
     def __init__(self, config_path: str, url: str, *args, **kwargs):
         super(CardSpider, self).__init__(*args, **kwargs)
         self.start_urls = [url]
-        self.bank_crawler_cfg = BankCrawlerConfig(**get_config(config_path))
+        self.bank_crawler_config = BankCrawlerConfig(**get_config(config_path))
 
     def parse(self, response: HtmlResponse):
-        item = CardsItem()
-        item.title = ""
-        item.url = response.url
+        # get the corresponding bank config from the url
+        bank_config = next(
+            (
+                bank_config
+                for bank_config in self.bank_crawler_config.banks
+                if bank_config.bank_code in response.url
+            ),
+            None,
+        )
 
+        if bank_config is None:
+            logging.error(f"No bank config found for url: {response.url}")
+            return
+
+        # get the tab URL from the page
+        tab_links = response.xpath(bank_config.xpaths.tab_links).getall()
+        
+        item = CardsItem()
         yield item

@@ -15,6 +15,6 @@ class CardsFilterPipeline:
         ...
 
     def process_item(self, item, spider):
-        item['date'] = datetime.now().strftime('%Y-%m-%d')
+        # item['date'] = datetime.now().strftime('%Y-%m-%d')
 
         return item
