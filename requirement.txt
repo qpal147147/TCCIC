@@ -7,4 +7,6 @@ Scrapy
 
 # general
 pydantic-settings
+pyyaml
+fastapi[standard]
 pytest

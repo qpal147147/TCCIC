@@ -64,7 +64,7 @@ ROBOTSTXT_OBEY = True
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'tccic.pipelines.pipelines.TccicPipeline': 300,
+    'tccic.pipelines.cards_filter_pipeline.CardsFilterPipeline': 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
