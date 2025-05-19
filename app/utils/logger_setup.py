@@ -20,7 +20,6 @@ LOG_INTERVAL = getattr(global_settings, 'LOG_INTERVAL', 1)
 LOG_BACKUP_COUNT = getattr(global_settings, 'LOG_BACKUP_COUNT', 30)
 LOG_UTC = getattr(global_settings, 'LOG_UTC', False)
 
-logging.getLogger('protego').setLevel(LOG_LEVEL)
 
 def setup_app_logger():
     """
