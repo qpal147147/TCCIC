@@ -2,19 +2,22 @@ banks:
   - bank_code: taishin
     bank_name: 台新銀行
     xpaths:
-      tab_links: //ul[@class="nav nav-tabs  tab-sty-1"]/li/a/@href
+      tab_link: //ul[@class="nav nav-tabs  tab-sty-1"]/li/a/@href
+      division: .//li[@class="ul-li-items" and @itemprop="itemListElement"]
       card:
-        title: //p[@itemprop="name"]/text()
-        url: //a[@itemprop="url"]/@href
-        content:    # If necessary, add more xpath to avoid matching without results
+        title: .//p[@itemprop="name"]/text()
+        url: .//a[@itemprop="url"]/@href
+        # If necessary, add more xpath to avoid matching without results
+        content:
           - //*[@id="centercontainer"]/div
   
   - bank_code: cathaybk
     bank_name: 國泰世華銀行
     xpaths:
-      tab_links: ""
+      tab_link: ""
+      division: ""
       card:
         title: ""
         url: ""
         content: 
-        - /html/body/div[1]/main/article
+          - /html/body/div[1]/main/article

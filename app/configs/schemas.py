@@ -7,7 +7,8 @@ class CardItemXPath(BaseModel):
     content: List[str]
 
 class PageXPaths(BaseModel):
-    tab_links: str
+    tab_link: str
+    division: str
     card: CardItemXPath
 
 class BankConfig(BaseModel):

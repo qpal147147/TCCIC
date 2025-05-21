@@ -11,8 +11,7 @@ from app.crawler.tccic.spiders.cards_spider import CardSpider
 from app.crawler.tccic import settings as project_settings
 from app.configs.settings import global_settings
 
-
-logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CONFIG_PATH = PROJECT_ROOT / "configs" / "banks.yaml"
@@ -51,14 +50,14 @@ def run_spider(config_path, url):
         process.crawl(CardSpider, config_path=config_path, url=url)
         process.start()
     except Exception as e:
-        logging.error(f"Error occurred while running the spider: {e}")
+        logger.error(f"Error occurred while running the spider: {e}")
 
 @router.get("/cards")
 async def start_crawling(url: str):
     """ 
     Start crawling all card information from the provided URL. 
     """
-    logging.info(f"Start crawling all card information from {url}.")
+    logger.info(f"Start crawling all card information from {url}.")
     
     p = Process(target=run_spider, args=(CONFIG_PATH, url))
     p.start()
