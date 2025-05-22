@@ -48,7 +48,7 @@ class GlobalSettings(BaseSettings):
     ACTIVE_LLM_PROVIDER: Literal["openai", "gemini", "huggingface"] = "gemini"
     ACTIVE_EMBEDDING_PROVIDER: Literal["openai", "gemini", "huggingface"] = "openai"
 
-    # configs
+    # Provider configs
     openai_config: OpenAIConfig = OpenAIConfig()
     gemini_config: GeminiConfig = GeminiConfig()
     huggingface_config: HuggingFaceConfig = HuggingFaceConfig()
@@ -61,6 +61,10 @@ class GlobalSettings(BaseSettings):
     LOG_INTERVAL: int = 1
     LOG_BACKUP_COUNT: int = 30
     LOG_UTC: bool = False
+
+    # data store settings
+    CRAWLER_DATA_DIR: str = "app/data_store/raw_json"
+    VECTOR_STORE_DIR: str = "app/data_store/vector_store"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

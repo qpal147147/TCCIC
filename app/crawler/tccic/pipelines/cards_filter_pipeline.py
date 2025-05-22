@@ -8,13 +8,40 @@
 import json
 from itemadapter import ItemAdapter
 from pathlib import Path
-from datetime import datetime
+
+from app.configs.settings import global_settings
 
 class CardsFilterPipeline:
-    def __init__(self):
-        ...
+    def open_spider(self, spider):
+        self.bank_code = getattr(spider, 'bank_code', "unknown")
+        if self.bank_code == "unknown":
+            spider.logger.warning("Bank code not found in spider. Using 'unknown' as default.")
+        
+        self.json_dir = Path(global_settings.CRAWLER_DATA_DIR) / f"{self.bank_code}"
+        self.json_dir.mkdir(parents=True, exist_ok=True)
+        self.json_path = self.json_dir / "cards.jsonl"
+            
+        spider.logger.debug(f"JSON path: {self.json_path}")
+        
+        try:
+            if self.json_path.exists():
+                spider.logger.warning(f"The file already exists: {self.json_path} and will be automatically overwritten.")
+                self.file = open(self.json_path, "w", encoding="utf-8")
+            else:
+                self.file = open(self.json_path, "a", encoding="utf-8")
+        except:
+            spider.logger.error(f"Failed to open file: {self.json_path}")
+            self.file = None
+            raise
+    
+    def close_spider(self, spider):
+        if self.file:
+            self.file.close()
+            spider.logger.info(f"The file has been saved to {self.json_path}")
 
     def process_item(self, item, spider):
-        # item['date'] = datetime.now().strftime('%Y-%m-%d')
+        if self.file:
+            self.file.write(json.dumps(ItemAdapter(item).asdict(), ensure_ascii=False) + "\n")
+            self.file.flush()
 
         return item

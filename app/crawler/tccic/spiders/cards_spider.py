@@ -9,9 +9,10 @@ from app.configs.schemas import BankCrawlerConfig
 class CardSpider(scrapy.Spider):
     name = "cardspider"
 
-    def __init__(self, config_path: str, url: str, *args, **kwargs):
+    def __init__(self, config_path: str, bank_code: str, url: str, *args, **kwargs):
         super(CardSpider, self).__init__(*args, **kwargs)
         self.start_urls = [url]
+        self.bank_code = bank_code
         self.bank_crawler_config = BankCrawlerConfig(**get_config(config_path))
         self.bank_config = None
 
@@ -21,13 +22,13 @@ class CardSpider(scrapy.Spider):
             (
                 bank_config
                 for bank_config in self.bank_crawler_config.banks
-                if bank_config.bank_code in response.url
+                if bank_config.bank_code == self.bank_code
             ),
             None,
         )
 
         if self.bank_config is None:
-            self.logger.error(f"No bank config found for url: {response.url}")
+            self.logger.error(f"No bank config found for bank code: {self.bank_code}")
             return
 
         # get the tab URL from the page
@@ -62,8 +63,10 @@ class CardSpider(scrapy.Spider):
 
             yield CardsItem(
                 bank_name = self.bank_config.bank_name,
-                title = card_title,
-                url = card_url,
+                bank_code = self.bank_config.bank_code,
+                page_url = response.url,
+                card_title = card_title,
+                card_url = response.urljoin(card_url)
             )
 
     def errback_httpbin(self, failure: Failure):

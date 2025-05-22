@@ -10,5 +10,7 @@ class CardsItem(scrapy.Item):
     CardsItem
     """
     bank_name = scrapy.Field()
-    title = scrapy.Field()
-    url = scrapy.Field()
+    bank_code = scrapy.Field()
+    page_url = scrapy.Field()
+    card_title = scrapy.Field()
+    card_url = scrapy.Field()

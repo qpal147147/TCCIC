@@ -1,7 +1,7 @@
 import sys
 import logging
+import multiprocessing
 from pathlib import Path
-from multiprocessing import Process
 
 from fastapi import APIRouter
 from scrapy.crawler import CrawlerProcess
@@ -39,7 +39,7 @@ def load_scrapy_settings() -> Settings:
 
 SCRAPY_SETTINGS: Settings = load_scrapy_settings()
 
-def run_spider(config_path, url):
+def run_spider(config_path: str, bank_code: str, url: str):
     """
     Initializes and runs the Scrapy spider in a separate process.
     This function is intended to be the target of a multiprocessing.Process.
@@ -50,19 +50,20 @@ def run_spider(config_path, url):
     """
     try:
         process = CrawlerProcess(SCRAPY_SETTINGS)
-        process.crawl(CardSpider, config_path=config_path, url=url)
+        process.crawl(CardSpider, config_path=config_path, bank_code=bank_code, url=url)
         process.start()
     except Exception as e:
         logger.error(f"Error occurred while running the spider: {e}")
 
 @router.get("/cards")
-async def start_crawling(url: str):
+async def start_crawling(bank_code: str, url: str):
     """ 
     Start crawling all card information from the provided URL. 
     """
-    logger.info(f"Start crawling all card information from {url}.")
+    logger.info(f"Start crawling all card information from {url}, bank code: {bank_code}")
     
-    p = Process(target=run_spider, args=(CONFIG_PATH, url))
+    result_queue = multiprocessing.Queue()
+    p = multiprocessing.Process(target=run_spider, args=(CONFIG_PATH, bank_code, url, result_queue))
     p.start()
     p.join()
 
