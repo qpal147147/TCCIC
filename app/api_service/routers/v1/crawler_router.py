@@ -10,6 +10,7 @@ from scrapy.settings import Settings
 from app.crawler.tccic.spiders.cards_spider import CardSpider
 from app.crawler.tccic import settings as project_settings
 from app.configs.settings import global_settings
+from app.utils.logger_setup import LOG_FORMAT, LOG_DIR, LOG_FILENAME
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,8 @@ def load_scrapy_settings() -> Settings:
             scrapy_settings.set(setting_name, getattr(project_settings, setting_name))
     
     scrapy_settings.set('LOG_LEVEL', global_settings.LOG_LEVEL)
+    scrapy_settings.set('LOG_FILE', f"{LOG_DIR}/{LOG_FILENAME}")
+    scrapy_settings.set('LOG_FORMAT', LOG_FORMAT)
     return scrapy_settings
 
 SCRAPY_SETTINGS: Settings = load_scrapy_settings()

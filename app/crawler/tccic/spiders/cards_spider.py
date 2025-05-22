@@ -1,5 +1,3 @@
-import logging 
-
 import scrapy
 from scrapy.http.response.html import HtmlResponse
 from twisted.python.failure import Failure
@@ -29,15 +27,15 @@ class CardSpider(scrapy.Spider):
         )
 
         if self.bank_config is None:
-            logging.error(f"No bank config found for url: {response.url}")
+            self.logger.error(f"No bank config found for url: {response.url}")
             return
 
         # get the tab URL from the page
         tab_links = response.xpath(self.bank_config.xpaths.tab_link).getall()
-        logging.info(f"Found {len(tab_links)} tabs.")
+        self.logger.info(f"Found {len(tab_links)} tabs.")
 
         if len(tab_links) == 0:
-            logging.error(f"No tab links found for url: {response.url}")
+            self.logger.error(f"No tab links found for url: {response.url}")
             return
 
         # get the card list from the page
@@ -51,16 +49,16 @@ class CardSpider(scrapy.Spider):
     def parse_tab(self, response: HtmlResponse):
         # get the card division from the list
         card_divisions = response.xpath(self.bank_config.xpaths.division)
-        logging.info(f"Found {len(card_divisions)} card divisions from url: {response.url}")
+        self.logger.info(f"Found {len(card_divisions)} card divisions from url: {response.url}")
 
         if len(card_divisions) == 0:
-            logging.error(f"No card divisions found from url: {response.url}")
+            self.logger.error(f"No card divisions found from url: {response.url}")
             return
         
         for card_div in card_divisions:
             card_title = card_div.xpath(self.bank_config.xpaths.card.title).get()
             card_url = card_div.xpath(self.bank_config.xpaths.card.url).get()
-            logging.info(f"Found card: {card_title}")
+            self.logger.info(f"Found card: {card_title}")
 
             yield CardsItem(
                 bank_name = self.bank_config.bank_name,
@@ -72,4 +70,4 @@ class CardSpider(scrapy.Spider):
         url = failure.request.url
         err_msg = failure.getErrorMessage()
 
-        logging.error(f"{err_msg} <GET {url}>")
+        self.logger.error(f"{err_msg} <GET {url}>")
