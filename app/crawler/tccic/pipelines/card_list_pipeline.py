@@ -9,9 +9,9 @@ import json
 from itemadapter import ItemAdapter
 from pathlib import Path
 
-from app.configs.settings import global_settings
+from app.configs.global_settings import global_settings
 
-class CardsFilterPipeline:
+class CardListPipeline:
     def open_spider(self, spider):
         self.bank_code = getattr(spider, 'bank_code', "unknown")
         if self.bank_code == "unknown":
@@ -19,13 +19,14 @@ class CardsFilterPipeline:
         
         self.json_dir = Path(global_settings.CRAWLER_DATA_DIR) / f"{self.bank_code}"
         self.json_dir.mkdir(parents=True, exist_ok=True)
-        self.json_path = self.json_dir / "cards.jsonl"
+        self.json_path = self.json_dir / "card_list.jsonl"
             
         spider.logger.debug(f"JSON path: {self.json_path}")
         
         try:
             if self.json_path.exists():
-                spider.logger.warning(f"The file already exists: {self.json_path} and will be automatically overwritten.")
+                self.json_path.unlink()
+                spider.logger.warning(f"The file already exists: `{self.json_path}` and will be automatically overwritten.")
                 self.file = open(self.json_path, "w", encoding="utf-8")
             else:
                 self.file = open(self.json_path, "a", encoding="utf-8")

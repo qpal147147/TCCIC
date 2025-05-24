@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 
-from app.configs.settings import global_settings
+from app.configs.global_settings import global_settings
 
 # default logger arguments
 LOG_FORMAT = "%(asctime)s [%(levelname)s] - [%(module)s.%(funcName)s:%(lineno)d]: %(message)s"

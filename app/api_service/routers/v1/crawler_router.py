@@ -4,12 +4,14 @@ import multiprocessing
 from pathlib import Path
 
 from fastapi import APIRouter
+from fastapi.responses import ORJSONResponse
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
-from app.crawler.tccic.spiders.cards_spider import CardSpider
+from app.crawler.schemas.card_list import BankCardListPageData
+from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic import settings as project_settings
-from app.configs.settings import global_settings
+from app.configs.global_settings import global_settings
 from app.utils.logger_setup import LOG_FORMAT, LOG_DIR, LOG_FILENAME
 
 logger = logging.getLogger(__name__)
@@ -50,21 +52,32 @@ def run_spider(config_path: str, bank_code: str, url: str):
     """
     try:
         process = CrawlerProcess(SCRAPY_SETTINGS)
-        process.crawl(CardSpider, config_path=config_path, bank_code=bank_code, url=url)
+        process.crawl(CardListSpider, config_path=config_path, bank_code=bank_code, url=url)
         process.start()
     except Exception as e:
         logger.error(f"Error occurred while running the spider: {e}")
 
 @router.get("/cards")
-async def start_crawling(bank_code: str, url: str):
+async def crawl_cards(bank_code: str, url: str):
     """ 
     Start crawling all card information from the provided URL. 
     """
     logger.info(f"Start crawling all card information from {url}, bank code: {bank_code}")
-    
-    result_queue = multiprocessing.Queue()
-    p = multiprocessing.Process(target=run_spider, args=(CONFIG_PATH, bank_code, url, result_queue))
+
+    p = multiprocessing.Process(target=run_spider, args=(CONFIG_PATH, bank_code, url))
     p.start()
     p.join()
 
-    return "OK"
+    logger.info(f"Crawling completed.")
+
+
+    try:
+        crawler_file_path = f"{global_settings.CRAWLER_DATA_DIR}/{bank_code}/card_list.jsonl"
+        with open(crawler_file_path, "r") as f:
+            data = f.read()
+            return {"status": "success", "data": data}
+    except FileNotFoundError:
+        return {"status": "fail", "error": f"File not found: {crawler_file_path}"}
+    
+
+    return ORJSONResponse(content={"status": "success", "data": "Crawling completed."})

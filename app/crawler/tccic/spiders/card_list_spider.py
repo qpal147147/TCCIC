@@ -4,29 +4,18 @@ from twisted.python.failure import Failure
 
 from app.crawler.tccic.items import CardsItem
 from app.utils.config_utils import get_config
-from app.configs.schemas import BankCrawlerConfig
+from app.crawler.schemas.bank_config import BankCrawlerConfig
 
-class CardSpider(scrapy.Spider):
-    name = "cardspider"
+class CardListSpider(scrapy.Spider):
+    name = "card_list_spider"
 
     def __init__(self, config_path: str, bank_code: str, url: str, *args, **kwargs):
-        super(CardSpider, self).__init__(*args, **kwargs)
+        super(CardListSpider, self).__init__(*args, **kwargs)
         self.start_urls = [url]
         self.bank_code = bank_code
-        self.bank_crawler_config = BankCrawlerConfig(**get_config(config_path))
-        self.bank_config = None
+        self.bank_config = BankCrawlerConfig(**get_config(config_path)).get_bank_config(bank_code)
 
     def parse(self, response: HtmlResponse):
-        # get the corresponding bank config from the url
-        self.bank_config = next(
-            (
-                bank_config
-                for bank_config in self.bank_crawler_config.banks
-                if bank_config.bank_code == self.bank_code
-            ),
-            None,
-        )
-
         if self.bank_config is None:
             self.logger.error(f"No bank config found for bank code: {self.bank_code}")
             return
