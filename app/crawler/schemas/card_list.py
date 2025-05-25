@@ -6,13 +6,13 @@ class CardItem(BaseModel):
     Card item schema
     """
     title: str
-    url: HttpUrl
+    url: str
 
 class CardPagesItem(BaseModel):
     """
     Card pages data schema
     """
-    page_url: HttpUrl
+    page_url: str
     cards: list[CardItem]
 
 class BankCardListPageData(BaseModel):

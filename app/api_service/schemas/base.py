@@ -8,7 +8,7 @@ class BaseResponse(BaseModel, Generic[DataT]):
     """
     Generic API response schema
     """
-    status: str = Literal["success", "fail"]
+    status: Literal["success", "fail"] = "fail"
     message: str = ""
-    error: Optional[str]
-    data: Optional[dict]
+    error: Optional[str] = None
+    data: Optional[DataT] = None

@@ -1,14 +1,16 @@
 import sys
 import logging
+import json
 import multiprocessing
 from pathlib import Path
 
 from fastapi import APIRouter
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
-from app.crawler.schemas.card_list import BankCardListPageData
+from app.api_service.schemas.base import BaseResponse
+from app.crawler.schemas.card_list import CardItem, CardPagesItem, BankCardListPageData
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic import settings as project_settings
 from app.configs.global_settings import global_settings
@@ -58,7 +60,7 @@ def run_spider(config_path: str, bank_code: str, url: str):
         logger.error(f"Error occurred while running the spider: {e}")
 
 @router.get("/cards")
-async def crawl_cards(bank_code: str, url: str):
+async def crawl_card_list(bank_code: str, url: str):
     """ 
     Start crawling all card information from the provided URL. 
     """
@@ -70,14 +72,59 @@ async def crawl_cards(bank_code: str, url: str):
 
     logger.info(f"Crawling completed.")
 
-
+    # read the JSONL file and return the data
+    base_response = BaseResponse[BankCardListPageData]()
     try:
         crawler_file_path = f"{global_settings.CRAWLER_DATA_DIR}/{bank_code}/card_list.jsonl"
+        
+        # remove duplicates
+        cleaned_item = []
         with open(crawler_file_path, "r") as f:
-            data = f.read()
-            return {"status": "success", "data": data}
-    except FileNotFoundError:
-        return {"status": "fail", "error": f"File not found: {crawler_file_path}"}
-    
+            cards = set()
+            for line in f:
+                json_data = json.loads(line)
+                if json_data['card_url'] not in cards:
+                    cards.add(json_data['card_url'])
+                    cleaned_item.append(json_data)
 
-    return ORJSONResponse(content={"status": "success", "data": "Crawling completed."})
+        # process the cleaned JSON data
+        page_map = {}
+        bank_name = ""
+        bank_code = ""
+        
+        for item in cleaned_item:
+            bank_name = item['bank_name']
+            bank_code = item['bank_code']
+            page_url = item['page_url']
+
+            card = CardItem(title=item['card_title'], url=item['card_url'])
+            if page_url not in page_map:
+                page_map[page_url] = CardPagesItem(page_url=page_url, cards=[card])
+            else:
+                page_map[page_url].cards.append(card)
+        
+        base_response.data = BankCardListPageData(
+            bank_code=bank_code, 
+            bank_name=bank_name, 
+            pages=list(page_map.values())
+        )
+
+        base_response.status = "success"
+        base_response.message = f"Successfully crawled all card information."
+        return JSONResponse(content=base_response.model_dump(), status_code=200)
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {crawler_file_path}")
+
+        base_response.status = "fail"
+        base_response.message = f"Error occurred while reading the JSONL file."
+        base_response.error = f"{e}"
+        base_response.data = None
+        return JSONResponse(content=base_response.model_dump(), status_code=500)
+    except Exception as e:
+        logger.error(f"Error occurred while reading the JSONL file: {e}")
+
+        base_response.status = "fail"
+        base_response.message = f"Error occurred while reading the JSONL file."
+        base_response.error = f"{e}"
+        base_response.data = None
+        return JSONResponse(content=base_response.model_dump(), status_code=500)
