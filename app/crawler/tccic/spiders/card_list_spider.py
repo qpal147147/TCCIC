@@ -21,8 +21,12 @@ class CardListSpider(scrapy.Spider):
             return
 
         # get the tab URL from the page
-        tab_links = response.xpath(self.bank_config.xpaths.tab_link).getall()
-        self.logger.info(f"Found {len(tab_links)} tabs.")
+        if self.bank_config.xpaths.tab_link is None:
+            tab_links = [response.url]
+            self.logger.warning(f"No tag xpath is set, so the initial page will be crawled.")
+        else:
+            tab_links = response.xpath(self.bank_config.xpaths.tab_link).getall()
+            self.logger.info(f"Found {len(tab_links)} tabs.")
 
         if len(tab_links) == 0:
             self.logger.error(f"No tab links found for url: {response.url}")
@@ -34,6 +38,7 @@ class CardListSpider(scrapy.Spider):
                 url=tab_link,
                 callback=self.parse_tab,
                 errback=self.errback_httpbin,
+                dont_filter=True
             )
 
     def parse_tab(self, response: HtmlResponse):

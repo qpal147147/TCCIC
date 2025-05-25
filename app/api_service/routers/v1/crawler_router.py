@@ -64,7 +64,7 @@ async def crawl_card_list(bank_code: str, url: str):
     """ 
     Start crawling all card information from the provided URL. 
     """
-    logger.info(f"Start crawling all card information from {url}, bank code: {bank_code}")
+    logger.info(f"Start crawling all card information from '{url}', bank code: '{bank_code}'")
 
     p = multiprocessing.Process(target=run_spider, args=(CONFIG_PATH, bank_code, url))
     p.start()

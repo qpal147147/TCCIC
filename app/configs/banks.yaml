@@ -2,6 +2,7 @@ banks:
   - bank_code: taishin
     bank_name: 台新銀行
     xpaths:
+      # if no tab or division, no need to fill in
       tab_link: //ul[@class="nav nav-tabs  tab-sty-1"]/li/a/@href
       division: .//li[@class="ul-li-items" and @itemprop="itemListElement"]
       card:
@@ -11,13 +12,13 @@ banks:
         content:
           - //*[@id="centercontainer"]/div
   
-  - bank_code: cathaybk
-    bank_name: 國泰世華銀行
+  - bank_code: dbs
+    bank_name: 星展銀行
     xpaths:
-      tab_link: ""
-      division: ""
+      tab_link: 
+      division: .//div[@data-card]
       card:
-        title: ""
-        url: ""
+        title: ./div/div/div[1]//text()
+        url: ./div/div/div[1]//@href
         content: 
-          - /html/body/div[1]/main/article
+          - ""

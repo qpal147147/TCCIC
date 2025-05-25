@@ -13,8 +13,8 @@ class PageXPaths(BaseModel):
     """
     Bank page xpaths schema
     """
-    tab_link: str
-    division: str
+    tab_link: Optional[str]
+    division: Optional[str]
     card: CardItemXPath
 
 class BankConfig(BaseModel):
