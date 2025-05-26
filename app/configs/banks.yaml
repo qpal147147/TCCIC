@@ -22,3 +22,25 @@ banks:
         url: ./div/div/div[1]//@href
         content: 
           - ""
+  
+  - bank_code: cathaybk
+    bank_name: 國泰世華
+    xpaths:
+      tab_link: 
+      division: //div[@class="cubre-m-compareCard -credit"]
+      card:
+        title: .//div[@class='cubre-m-compareCard__title']/text()
+        url: .//div[@class="cubre-m-compareCard__link"]//@href
+        content: 
+          - ""
+
+  - bank_code: sinopac
+    bank_name: 永豐銀行
+    xpaths:
+      tab_link: //h2[normalize-space(text())="卡片總覽"]/parent::li/ul[@class="lv2"]/li/a/@href
+      division: //ul[@class="Ltype1 cf"]/li
+      card:
+        title: ./h2/a/text()
+        url: ./h2/a/@href
+        content: 
+          - ""

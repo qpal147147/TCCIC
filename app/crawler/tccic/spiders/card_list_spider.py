@@ -51,10 +51,14 @@ class CardListSpider(scrapy.Spider):
             return
         
         for card_div in card_divisions:
-            card_title = card_div.xpath(self.bank_config.xpaths.card.title).get()
-            card_url = card_div.xpath(self.bank_config.xpaths.card.url).get()
-            self.logger.info(f"Found card: {card_title}")
+            card_title = card_div.xpath(self.bank_config.xpaths.card.title).get().strip()
+            card_url = card_div.xpath(self.bank_config.xpaths.card.url).get().strip()
 
+            if card_url is None:
+                self.logger.warning(f"The `{card_title}` card have no url and will be automatically skipped.")
+                continue
+
+            self.logger.info(f"Found card: {card_title}")
             yield CardsItem(
                 bank_name = self.bank_config.bank_name,
                 bank_code = self.bank_config.bank_code,
