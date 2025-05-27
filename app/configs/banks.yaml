@@ -44,3 +44,36 @@ banks:
         url: ./h2/a/@href
         content: 
           - ""
+
+  - bank_code: fubon
+    bank_name: 台北富邦銀行
+    xpaths:
+      tab_link: 
+      division: //li[@class="credit-card"]
+      card:
+        title: ./div[@class="title"]/text()
+        url: ./a[span[normalize-space(text())="了解更多"]]/@href
+        content: 
+          - ""
+
+  - bank_code: esunbank
+    bank_name: 玉山銀行
+    xpaths:
+      tab_link: 
+      division: //div[@data-cardattr]
+      card:
+        title: .//h3[@class="l-card__title"]/text()
+        url: ./a/@href
+        content: 
+          - ""
+
+  - bank_code: hsbc
+    bank_name: 滙豐銀行
+    xpaths:
+      tab_link: 
+      division: //div[@class="productModule"]
+      card:
+        title: .//*[contains(@class, "A-LNKND38L-RW-ALL")]/text()
+        url: .//a[@class="A-BTNSO-RW-ALL"]/@href
+        content: 
+          - ""
