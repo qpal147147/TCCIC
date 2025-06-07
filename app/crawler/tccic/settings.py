@@ -11,10 +11,9 @@ BOT_NAME = "tccic"
 
 SPIDER_MODULES = ["tccic.spiders"]
 NEWSPIDER_MODULE = "tccic.spiders"
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = "tccic (+http://www.yourdomain.com)"
+USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
@@ -37,10 +36,10 @@ ROBOTSTXT_OBEY = True
 #TELNETCONSOLE_ENABLED = False
 
 # Override the default request headers:
-#DEFAULT_REQUEST_HEADERS = {
-#    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-#    "Accept-Language": "en",
-#}
+DEFAULT_REQUEST_HEADERS = {
+    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6"
+}
 
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
@@ -88,6 +87,14 @@ ITEM_PIPELINES = {
 #HTTPCACHE_STORAGE = "scrapy.extensions.httpcache.FilesystemCacheStorage"
 
 # Set settings whose default value is deprecated to a future-proof value
+DOWNLOAD_HANDLERS = {
+    "http": "scrapy_playwright_stealth.handler.ScrapyPlaywrightStealthDownloadHandler",
+    "https": "scrapy_playwright_stealth.handler.ScrapyPlaywrightStealthDownloadHandler",
+}
+
+PLAYWRIGHT_LAUNCH_OPTIONS = {
+    "headless": True,
+}
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"

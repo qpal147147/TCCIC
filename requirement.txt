@@ -2,6 +2,9 @@
 
 # crawler
 Scrapy
+scrapy-playwright
+scrapy-playwright-stealth
+# playwright install
 
 # RAG
 

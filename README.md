@@ -30,6 +30,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [X] RESTful API style
 - [x] Make crawlers more automated
     - [x] Automatically search all cards
+    - [x] Support dynamic web crawler
 - [ ] Support image retrieval
 - [ ] Customize llm package
 - [ ] Remove the llama-index framework

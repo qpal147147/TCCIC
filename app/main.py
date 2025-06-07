@@ -1,9 +1,11 @@
 import logging
+import multiprocessing
 from fastapi import FastAPI
 
 from app.api_service.routers.v1.api import router as v1_router
 from app.utils.logger_setup import setup_app_logger
 
+multiprocessing.set_start_method("spawn")
 
 app = FastAPI()
 app.include_router(v1_router, prefix="/api/v1")

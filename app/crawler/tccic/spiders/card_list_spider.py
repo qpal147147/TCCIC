@@ -1,5 +1,7 @@
 import scrapy
 from scrapy.http.response.html import HtmlResponse
+from scrapy_playwright.page import PageMethod
+from playwright.async_api import Page
 from twisted.python.failure import Failure
 
 from app.crawler.tccic.items import CardsItem
@@ -21,27 +23,94 @@ class CardListSpider(scrapy.Spider):
             return
 
         # get the tab URL from the page
+        tab_links = []
         if self.bank_config.xpaths.tab_link is None:
             tab_links = [response.url]
             self.logger.warning(f"No tag xpath is set, so the initial page will be crawled.")
-        else:
+        elif not self.bank_config.is_dynamic:
             tab_links = response.xpath(self.bank_config.xpaths.tab_link).getall()
             self.logger.info(f"Found {len(tab_links)} tabs.")
 
-        if len(tab_links) == 0:
+        if len(tab_links) == 0 and not self.bank_config.is_dynamic:
             self.logger.error(f"No tab links found for url: {response.url}")
             return
 
         # get the card list from the page
-        for tab_link in tab_links:
-            yield response.follow(
-                url=tab_link,
-                callback=self.parse_tab,
+        if self.bank_config.is_dynamic:
+            self.logger.info("Current crawler mode is dynamic.")
+
+            yield scrapy.Request(
+                url=response.url,
+                meta={
+                    "playwright": True,
+                    "playwright_include_page": True,
+                },
+                callback=self.parse_dynamic_page,
                 errback=self.errback_httpbin,
                 dont_filter=True
             )
+        else:
+            self.logger.info("Current crawler mode is static.")
 
-    def parse_tab(self, response: HtmlResponse):
+            for tab_link in tab_links:
+                yield response.follow(
+                    url=tab_link,
+                    callback=self.parse_static_page,
+                    errback=self.errback_httpbin,
+                    dont_filter=True
+                )
+
+    async def parse_dynamic_page(self, response: HtmlResponse):
+        page: Page = response.meta.get("playwright_page")
+        if not page:
+            self.logger.error("Playwright page object not found in meta!")
+            return
+        
+        self.logger.info(f"Initial page loaded: {response.url}")
+        try:
+            await page.wait_for_timeout(10000)  # waiting for the page to load
+            tab_elements = []
+
+            self.logger.info("Look for the `iframe` tag...")
+            frame_element = await page.query_selector("iframe")
+            if frame_element:
+                frame = await frame_element.content_frame()
+                if frame:
+                    await frame.wait_for_selector(self.bank_config.xpaths.tab_link, state='visible')
+                    tab_elements = await frame.query_selector_all(self.bank_config.xpaths.tab_link)
+                    self.logger.info(f"Found {len(tab_elements)} tabs in iframe.")
+
+            # get the list of cards from each tab
+            for tab in tab_elements:
+                button_text = (await tab.text_content()).strip()
+
+                await frame.page.wait_for_load_state("networkidle", timeout=20000)
+                await tab.click(timeout=20000)
+                await frame.page.wait_for_timeout(2000)
+                self.logger.info(f"Clicking tag in iframe: '{button_text}'")
+
+                html = await frame.content()
+                mock_response_for_iframe = HtmlResponse(
+                    url=response.url,
+                    body=html,
+                    encoding='utf-8',
+                    request=response.request
+                )
+
+                parsed_results = self.parse_static_tab(mock_response_for_iframe)
+                if parsed_results:
+                    for yielded_value in parsed_results:
+                        yield yielded_value
+
+        except Exception as e:            
+            webdriver_flag = await page.evaluate("navigator.webdriver")
+            self.logger.debug(f"Is Robot: {webdriver_flag}")
+            self.logger.error(f"{e}")
+            await page.close()
+            
+        return
+
+    def parse_static_page(self, response: HtmlResponse):
         # get the card division from the list
         card_divisions = response.xpath(self.bank_config.xpaths.division)
         self.logger.info(f"Found {len(card_divisions)} card divisions from url: {response.url}")
@@ -52,7 +121,7 @@ class CardListSpider(scrapy.Spider):
         
         for card_div in card_divisions:
             card_title = card_div.xpath(self.bank_config.xpaths.card.title).get().strip()
-            card_url = card_div.xpath(self.bank_config.xpaths.card.url).get().strip()
+            card_url = card_div.xpath(self.bank_config.xpaths.card.url).get()
 
             if card_url is None:
                 self.logger.warning(f"The `{card_title}` card have no url and will be automatically skipped.")

@@ -23,6 +23,7 @@ class BankConfig(BaseModel):
     """
     bank_code: str
     bank_name: str
+    is_dynamic: bool
     xpaths: PageXPaths
 
 class BankCrawlerConfig(BaseModel):

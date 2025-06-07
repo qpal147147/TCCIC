@@ -1,6 +1,7 @@
 banks:
   - bank_code: taishin
     bank_name: 台新銀行
+    is_dynamic: False
     xpaths:
       # if no tab or division, no need to fill in
       tab_link: //ul[@class="nav nav-tabs  tab-sty-1"]/li/a/@href
@@ -14,6 +15,7 @@ banks:
   
   - bank_code: dbs
     bank_name: 星展銀行
+    is_dynamic: False
     xpaths:
       tab_link: 
       division: .//div[@data-card]
@@ -25,6 +27,7 @@ banks:
   
   - bank_code: cathaybk
     bank_name: 國泰世華
+    is_dynamic: False
     xpaths:
       tab_link: 
       division: //div[@class="cubre-m-compareCard -credit"]
@@ -36,6 +39,7 @@ banks:
 
   - bank_code: sinopac
     bank_name: 永豐銀行
+    is_dynamic: False
     xpaths:
       tab_link: //h2[normalize-space(text())="卡片總覽"]/parent::li/ul[@class="lv2"]/li/a/@href
       division: //ul[@class="Ltype1 cf"]/li
@@ -47,6 +51,7 @@ banks:
 
   - bank_code: fubon
     bank_name: 台北富邦銀行
+    is_dynamic: False
     xpaths:
       tab_link: 
       division: //li[@class="credit-card"]
@@ -58,6 +63,7 @@ banks:
 
   - bank_code: esunbank
     bank_name: 玉山銀行
+    is_dynamic: False
     xpaths:
       tab_link: 
       division: //div[@data-cardattr]
@@ -69,6 +75,7 @@ banks:
 
   - bank_code: hsbc
     bank_name: 滙豐銀行
+    is_dynamic: False
     xpaths:
       tab_link: 
       division: //div[@class="productModule"]
@@ -77,3 +84,16 @@ banks:
         url: .//a[@class="A-BTNSO-RW-ALL"]/@href
         content: 
           - ""
+
+  - bank_code: ctbcbank
+    bank_name: 中國信託
+    is_dynamic: True
+    xpaths:
+      tab_link: //a[contains(@class, "twrbo-c-filterOption")]
+      division: //li[@class="twrbc-creditcard-list-item"]
+      card:
+        title: .//a[@class="twrbc-creditcard-title"]/text()
+        url: .//div[@class="twrbc-creditcard-tools"]/a/@href
+        content: 
+          - ""
+
