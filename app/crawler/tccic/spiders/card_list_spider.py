@@ -76,17 +76,23 @@ class CardListSpider(scrapy.Spider):
             if frame_element:
                 frame = await frame_element.content_frame()
                 if frame:
-                    await frame.wait_for_selector(self.bank_config.xpaths.tab_link, state='visible')
+                    # await frame.wait_for_selector(self.bank_config.xpaths.tab_link, state='visible')
                     tab_elements = await frame.query_selector_all(self.bank_config.xpaths.tab_link)
                     self.logger.info(f"Found {len(tab_elements)} tabs in iframe.")
+            
+            if not tab_elements:
+                self.logger.info("Look for the `xpath` from html...")
+                frame = page
+                tab_elements = await page.query_selector_all(self.bank_config.xpaths.tab_link)
+                self.logger.info(f"Found {len(tab_elements)} tabs in iframe.")
 
             # get the list of cards from each tab
             for tab in tab_elements:
                 button_text = (await tab.text_content()).strip()
 
-                await frame.page.wait_for_load_state("networkidle", timeout=20000)
+                # await page.wait_for_load_state("networkidle", timeout=20000)
                 await tab.click(timeout=20000)
-                await frame.page.wait_for_timeout(2000)
+                await page.wait_for_timeout(2000)
                 self.logger.info(f"Clicking tag in iframe: '{button_text}'")
 
                 html = await frame.content()
@@ -97,18 +103,17 @@ class CardListSpider(scrapy.Spider):
                     request=response.request
                 )
 
-                parsed_results = self.parse_static_tab(mock_response_for_iframe)
+                parsed_results = self.parse_static_page(mock_response_for_iframe)
                 if parsed_results:
                     for yielded_value in parsed_results:
                         yield yielded_value
-
         except Exception as e:            
             webdriver_flag = await page.evaluate("navigator.webdriver")
             self.logger.debug(f"Is Robot: {webdriver_flag}")
             self.logger.error(f"{e}")
+        finally:
             await page.close()
-            
-        return
+            return
 
     def parse_static_page(self, response: HtmlResponse):
         # get the card division from the list

@@ -96,4 +96,39 @@ banks:
         url: .//div[@class="twrbc-creditcard-tools"]/a/@href
         content: 
           - ""
+    
+  - bank_code: firstbank
+    bank_name: 第一銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: //div[contains(@class, "card-item")]
+      card:
+        title: .//strong/text()
+        url: .//a[1]/@href
+        content: 
+          - ""
 
+  - bank_code: feib
+    bank_name: 遠東商銀
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: //div[contains(@class, "carousel-item")]
+      card:
+        title: ./h2/text()
+        url: ./a/@href
+        content: 
+          - ""
+
+  - bank_code: rakuten
+    bank_name: 台灣樂天
+    is_dynamic: True
+    xpaths:
+      tab_link: //div[@id="navCampaign"]//a
+      division: '//div[@style="display: block;"]'
+      card:
+        title: //div[@id="navCampaign"]//a[@class="active"]/text()
+        url: .//a[@class="btnApply_b"]/@href
+        content: 
+          - ""
