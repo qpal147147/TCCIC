@@ -1,3 +1,4 @@
+import re
 import scrapy
 from scrapy.http.response.html import HtmlResponse
 from scrapy_playwright.page import PageMethod
@@ -51,14 +52,30 @@ class CardListSpider(scrapy.Spider):
             )
         else:
             self.logger.info("Current crawler mode is static.")
+            if self.bank_code == "yuantabank":
+                # simulate a post request, since javascript doesn't work
+                total_pages = response.css('form#form4paging input#pA::attr(value)').get()
 
-            for tab_link in tab_links:
-                yield response.follow(
-                    url=tab_link,
-                    callback=self.parse_static_page,
-                    errback=self.errback_httpbin,
-                    dont_filter=True
-                )
+                for i in range(int(total_pages)):
+                    yield scrapy.FormRequest(
+                        url=response.url,
+                        formdata={
+                            'pN': f"{i+1}",
+                            'pA': total_pages,
+                            'iA': response.css('form#form4paging input#iA::attr(value)').get(),
+                            'creditcard_type': "",
+                        },
+                        callback=self.parse_static_page,
+                        errback=self.errback_httpbin,
+                    )
+            else:
+                for tab_link in tab_links:
+                    yield response.follow(
+                        url=tab_link,
+                        callback=self.parse_static_page,
+                        errback=self.errback_httpbin,
+                        dont_filter=True
+                    )
 
     async def parse_dynamic_page(self, response: HtmlResponse):
         page: Page = response.meta.get("playwright_page")
@@ -78,16 +95,16 @@ class CardListSpider(scrapy.Spider):
                 if frame:
                     # await frame.wait_for_selector(self.bank_config.xpaths.tab_link, state='visible')
                     tab_elements = await frame.query_selector_all(self.bank_config.xpaths.tab_link)
-                    self.logger.info(f"Found {len(tab_elements)} tabs in iframe.")
+                    self.logger.info(f"Found {len(tab_elements)} tabs in page.")
             
             if not tab_elements:
                 self.logger.info("Look for the `xpath` from html...")
                 frame = page
                 tab_elements = await page.query_selector_all(self.bank_config.xpaths.tab_link)
-                self.logger.info(f"Found {len(tab_elements)} tabs in iframe.")
+                self.logger.info(f"Found {len(tab_elements)} tabs in page.")
 
             # get the list of cards from each tab
-            for tab in tab_elements:
+            for i, tab in enumerate(tab_elements):
                 button_text = (await tab.text_content()).strip()
 
                 # await page.wait_for_load_state("networkidle", timeout=20000)

@@ -132,3 +132,39 @@ banks:
         url: .//a[@class="btnApply_b"]/@href
         content: 
           - ""
+
+  - bank_code: americanexpress
+    bank_name: 美國運通
+    is_dynamic: True
+    xpaths:
+      tab_link: //button[contains(@class, "sc_mo_carousel-card-tabs_item")]
+      division: //div[contains(@class, "sc_at_box_root")]//div[@data-qe-id="HorizontalCardTile"]
+      card:
+        title: .//div[contains(@class, "sc_fontType_helvetica_bold")]/text()
+        url: .//a[contains(@class, "sc_horizontallyFluid")]/@href
+        content: 
+          - ""
+
+  - bank_code: ubot
+    bank_name: 聯邦銀行
+    is_dynamic: True
+    xpaths:
+      tab_link: //div[@class="accordion-body"]//a[@aria-current="page"]
+      division: //div[@class="cardDiv"]
+      card:
+        title: .//a/h2/text()
+        url: .//button[@class="btn buttonMore"]/../@href
+        content: 
+          - ""
+
+  - bank_code: yuantabank
+    bank_name: 元大銀行
+    is_dynamic: False
+    xpaths:
+      tab_link:
+      division: //div[@class="card_items"]//li
+      card:
+        title: ./div[@class="card_name"]//text()
+        url: ./a/@href
+        content: 
+          - ""
