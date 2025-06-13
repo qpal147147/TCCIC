@@ -22,7 +22,7 @@ class CardListSpider(scrapy.Spider):
         if self.bank_config is None:
             self.logger.error(f"No bank config found for bank code: {self.bank_code}")
             return
-
+        
         # get the tab URL from the page
         tab_links = []
         if self.bank_config.xpaths.tab_link is None:
@@ -52,6 +52,7 @@ class CardListSpider(scrapy.Spider):
             )
         else:
             self.logger.info("Current crawler mode is static.")
+
             if self.bank_code == "yuantabank":
                 # simulate a post request, since javascript doesn't work
                 total_pages = response.css('form#form4paging input#pA::attr(value)').get()
@@ -86,44 +87,66 @@ class CardListSpider(scrapy.Spider):
         self.logger.info(f"Initial page loaded: {response.url}")
         try:
             await page.wait_for_timeout(10000)  # waiting for the page to load
-            tab_elements = []
 
-            self.logger.info("Look for the `iframe` tag...")
-            frame_element = await page.query_selector("iframe")
-            if frame_element:
-                frame = await frame_element.content_frame()
-                if frame:
-                    # await frame.wait_for_selector(self.bank_config.xpaths.tab_link, state='visible')
-                    tab_elements = await frame.query_selector_all(self.bank_config.xpaths.tab_link)
+            if self.bank_config.xpaths.tab_link:
+                self.logger.info("Find all the tab elements...")
+                tab_elements = []
+
+                self.logger.info("Look for the `iframe` tag...")
+                frame_element = await page.query_selector("iframe")
+                if frame_element:
+                    frame = await frame_element.content_frame()
+                    if frame:
+                        # await frame.wait_for_selector(self.bank_config.xpaths.tab_link, state='visible')
+                        tab_elements = await frame.query_selector_all(self.bank_config.xpaths.tab_link)
+                        self.logger.info(f"Found {len(tab_elements)} tabs in frame.")
+                
+                if not tab_elements:
+                    self.logger.info("Look for the `xpath` from html...")
+                    frame = page
+                    tab_elements = await page.query_selector_all(self.bank_config.xpaths.tab_link)
                     self.logger.info(f"Found {len(tab_elements)} tabs in page.")
-            
-            if not tab_elements:
-                self.logger.info("Look for the `xpath` from html...")
-                frame = page
-                tab_elements = await page.query_selector_all(self.bank_config.xpaths.tab_link)
-                self.logger.info(f"Found {len(tab_elements)} tabs in page.")
 
-            # get the list of cards from each tab
-            for i, tab in enumerate(tab_elements):
-                button_text = (await tab.text_content()).strip()
+                # get the list of cards from each tab
+                for i, tab in enumerate(tab_elements):
+                    # Re-crawl elements to avoid invalid DOM caused by page jumps
+                    tab = (await page.query_selector_all(self.bank_config.xpaths.tab_link))[i]
 
-                # await page.wait_for_load_state("networkidle", timeout=20000)
-                await tab.click(timeout=20000)
-                await page.wait_for_timeout(2000)
-                self.logger.info(f"Clicking tag in iframe: '{button_text}'")
+                    button_text = (await tab.text_content()).strip()
+                    self.logger.info(f"Clicking tag in iframe: '{button_text}'")
 
-                html = await frame.content()
-                mock_response_for_iframe = HtmlResponse(
+                    # await page.wait_for_load_state("networkidle", timeout=20000)
+                    await tab.click(timeout=20000, force=True)
+                    await page.wait_for_timeout(2000)
+
+                    html = await frame.content()
+                    mock_response_for_iframe = HtmlResponse(
+                        url=frame.url,
+                        body=html,
+                        encoding='utf-8',
+                        request=response.request
+                    )
+
+                    parsed_results = self.parse_static_page(mock_response_for_iframe)
+                    if parsed_results:
+                        for yielded_value in parsed_results:
+                            yield yielded_value
+            else:
+                self.logger.info("No tabs is provided. Search cards directly from the current page.")
+
+                html = await page.content()
+                mock_response_for_page = HtmlResponse(
                     url=response.url,
                     body=html,
                     encoding='utf-8',
                     request=response.request
                 )
 
-                parsed_results = self.parse_static_page(mock_response_for_iframe)
+                parsed_results = self.parse_static_page(mock_response_for_page)
                 if parsed_results:
-                    for yielded_value in parsed_results:
-                        yield yielded_value
+                        for yielded_value in parsed_results:
+                            yield yielded_value
+
         except Exception as e:            
             webdriver_flag = await page.evaluate("navigator.webdriver")
             self.logger.debug(f"Is Robot: {webdriver_flag}")
@@ -142,8 +165,11 @@ class CardListSpider(scrapy.Spider):
             return
         
         for card_div in card_divisions:
-            card_title = card_div.xpath(self.bank_config.xpaths.card.title).get().strip()
-            card_url = card_div.xpath(self.bank_config.xpaths.card.url).get()
+            card_title = card_div.xpath(f"{self.bank_config.xpaths.card.title}").get().strip()
+            card_url = card_div.xpath(f"{self.bank_config.xpaths.card.url}").get()
+            
+            if self.bank_config.xpaths.card.url == "tab_url":
+                card_url = response.url
 
             if card_url is None:
                 self.logger.warning(f"The `{card_title}` card have no url and will be automatically skipped.")

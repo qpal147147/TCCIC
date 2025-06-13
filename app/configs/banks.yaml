@@ -8,6 +8,7 @@ banks:
       division: .//li[@class="ul-li-items" and @itemprop="itemListElement"]
       card:
         title: .//p[@itemprop="name"]/text()
+        # If the card url is the current url, fill in "tab_url"
         url: .//a[@itemprop="url"]/@href
         # If necessary, add more xpath to avoid matching without results
         content:
@@ -166,5 +167,197 @@ banks:
       card:
         title: ./div[@class="card_name"]//text()
         url: ./a/@href
+        content: 
+          - ""
+
+  - bank_code: megabank
+    bank_name: 兆豐銀行
+    is_dynamic: True
+    xpaths:
+      tab_link:
+      division: //div[contains(@class, "item card ")]
+      card:
+        title: ./span/h2/text()
+        url: .//a[contains(@class, "outline")]/@href
+        content: 
+          - ""
+
+  - bank_code: hncb
+    bank_name: 華南銀行
+    is_dynamic: False
+    xpaths:
+      tab_link:
+      division: //div[@class="creditcard-item h-100"]
+      card:
+        title: .//div[@class="creditcard-title"]/a/text()
+        url: .//div[@class="creditcard-title"]/a/@href
+        content: 
+          - ""
+
+  - bank_code: skbank
+    bank_name: 新光銀行
+    is_dynamic: True
+    xpaths:
+      tab_link: //li[contains(@class, "pagination__item")]/a
+      division: //div[contains(@class, "credit-card ng-tns-c183-3")]
+      card:
+        title: .//div[contains(@class, "credit-card__subtitle")]/text()
+        url: .//div[contains(@class, "button-secondary button-normal")]/../@href
+        content: 
+          - ""
+
+  - bank_code: tcb
+    bank_name: 合作金庫
+    is_dynamic: True
+    xpaths:
+      tab_link: //div[@class="c-pager__pages"]/a
+      division: //div[@class="l-creditCard__item fjs_item"]
+      card:
+        title: .//div[@class="c-creditCard__title"]/text()
+        url: .//a[contains(@class, "o-btn--secondary")]/@href
+        content: 
+          - ""
+
+  - bank_code: bankchb
+    bank_name: 彰化銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: //div[@class="sidemenu-block"]//a/@href
+      division: //div[@class="content-Ri"]
+      card:
+        title: //ul[@class="breadcrumb"]/li[@class="active"]/text()
+        url: tab_url
+        content: 
+          - ""
+
+  - bank_code: scsb
+    bank_name: 上海銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: //div[@class="row ctcard-list"]
+      card:
+        title: .//h3/text()
+        url: .//a[contains(@title, "了解更多")]/@href
+        content: 
+          - ""
+
+  - bank_code: sc
+    bank_name: 渣打銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: //div[@class="sc-content-wrapper"]
+      card:
+        title: .//h2[@class="sc-product-action-cvp__heading"]/text()
+        url: .//a[contains(@class, "sc-btn--secondary")]/@href
+        content: 
+          - ""
+
+  - bank_code: kgibank
+    bank_name: 凱基銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: //div[@class="bg-white bg-lg-none py-16 px-12 px-lg-0 py-lg-0 d-flex fp-100p fb-lg-47p mr-0 mb-12 mr-lg-28 mb-lg-40"]
+      card:
+        title: .//div[@class="fs-h3 fs-lg-h3 color-primary-blue"]/text()
+        url: .//a//@href
+        content: 
+          - ""
+
+  - bank_code: landbank
+    bank_name: 土地銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: //ul[@class="contect_menu_item"][2]/li/a/@href
+      division: //div[@class="col-md-6"]
+      card:
+        title: .//span/text()
+        url: .//a/@href
+        content: 
+          - ""
+
+  - bank_code: bot
+    bank_name: 臺灣銀行
+    is_dynamic: True
+    xpaths:
+      tab_link: //div[@class="LeftMenu"]//li/a
+      division: //div[@class="Column Tab_1"]
+      card:
+        title: .//div[@class="KV_PiC"]/h2/text()
+        url: tab_url
+        content: 
+          - ""
+
+  - bank_code: tbb
+    bank_name: 台灣企銀
+    is_dynamic: True
+    xpaths:
+      tab_link: //a[contains(@class, "c-pager__num")]
+      division: //div[@class="c-creditcard"]
+      card:
+        title: .//div[@class="c-creditcard__title"]/text()
+        url: .//span[text()="了解更多"]/../@href
+        content: 
+          - ""
+
+  - bank_code: tcbbank
+    bank_name: 台中銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: 
+      card:
+        title: 
+        url: 
+        content: 
+          - ""
+
+  - bank_code: entiebank
+    bank_name: 安泰銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: 
+      card:
+        title: 
+        url: 
+        content: 
+          - ""
+
+  - bank_code: sunnybank
+    bank_name: 陽信銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: 
+      card:
+        title: 
+        url: 
+        content: 
+          - ""
+
+  - bank_code: bok
+    bank_name: 高雄銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: 
+      card:
+        title: 
+        url: 
+        content: 
+          - ""
+
+  - bank_code: obank
+    bank_name: 王道銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: 
+      card:
+        title: 
+        url: 
         content: 
           - ""
