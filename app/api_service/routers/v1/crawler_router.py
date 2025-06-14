@@ -83,8 +83,10 @@ async def crawl_card_list(bank_code: str, url: str):
             cards = set()
             for line in f:
                 json_data = json.loads(line)
-                if json_data['card_url'] not in cards:
-                    cards.add(json_data['card_url'])
+                card_info = (json_data['card_url'], json_data['card_title'])
+                
+                if card_info not in cards:
+                    cards.add(card_info)
                     cleaned_item.append(json_data)
 
         # process the cleaned JSON data

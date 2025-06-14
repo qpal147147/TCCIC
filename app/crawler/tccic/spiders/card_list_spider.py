@@ -27,7 +27,7 @@ class CardListSpider(scrapy.Spider):
         tab_links = []
         if self.bank_config.xpaths.tab_link is None:
             tab_links = [response.url]
-            self.logger.warning(f"No tag xpath is set, so the initial page will be crawled.")
+            self.logger.warning(f"No tab xpath is set, so the initial page will be crawled.")
         elif not self.bank_config.is_dynamic:
             tab_links = response.xpath(self.bank_config.xpaths.tab_link).getall()
             self.logger.info(f"Found {len(tab_links)} tabs.")

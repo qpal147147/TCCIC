@@ -3,7 +3,7 @@ banks:
     bank_name: 台新銀行
     is_dynamic: False
     xpaths:
-      # if no tab or division, no need to fill in
+      # if no tab, no need to fill in
       tab_link: //ul[@class="nav nav-tabs  tab-sty-1"]/li/a/@href
       division: .//li[@class="ul-li-items" and @itemprop="itemListElement"]
       card:
@@ -307,22 +307,22 @@ banks:
     is_dynamic: False
     xpaths:
       tab_link: 
-      division: 
+      division: //div[@class="admin-btn"]
       card:
-        title: 
-        url: 
+        title: .//p/text()
+        url: .//a/@href
         content: 
           - ""
 
   - bank_code: entiebank
     bank_name: 安泰銀行
-    is_dynamic: False
+    is_dynamic: True
     xpaths:
       tab_link: 
-      division: 
+      division: //div[contains(@class, "card vertical") or contains(@class, "card horizontal")]
       card:
-        title: 
-        url: 
+        title: ./div[@class="cardTitle"]/text()
+        url: ./a/@href
         content: 
           - ""
 
@@ -331,10 +331,10 @@ banks:
     is_dynamic: False
     xpaths:
       tab_link: 
-      division: 
+      division: //ul[@id="smenu-125"]/li
       card:
-        title: 
-        url: 
+        title: ./a/@title
+        url: ./a/@href
         content: 
           - ""
 
@@ -343,10 +343,10 @@ banks:
     is_dynamic: False
     xpaths:
       tab_link: 
-      division: 
+      division: //div[@class="card-intro-box"]
       card:
-        title: 
-        url: 
+        title: ./h3/text()
+        url: tab_url
         content: 
           - ""
 
@@ -354,10 +354,10 @@ banks:
     bank_name: 王道銀行
     is_dynamic: False
     xpaths:
-      tab_link: 
-      division: 
+      tab_link: //ul[@class="w3-ul disc"]/li/a/@href
+      division: //div[@class="n-table-medium"]
       card:
-        title: 
-        url: 
+        title: .//h4/text()
+        url: .//a[text()="了解更多" or text()="詳細活動內容"]/@href
         content: 
           - ""
