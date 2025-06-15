@@ -110,7 +110,7 @@ class CardListSpider(scrapy.Spider):
                 # get the list of cards from each tab
                 for i, tab in enumerate(tab_elements):
                     # Re-crawl elements to avoid invalid DOM caused by page jumps
-                    tab = (await page.query_selector_all(self.bank_config.xpaths.tab_link))[i]
+                    tab = (await frame.query_selector_all(self.bank_config.xpaths.tab_link))[i]
 
                     button_text = (await tab.text_content()).strip()
                     self.logger.info(f"Clicking tag in iframe: '{button_text}'")
