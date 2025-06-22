@@ -1,6 +1,24 @@
+import time
 import requests
 import re
 import pytest
+
+
+def wait_for_result(job_id, timeout=60, interval=5):
+    """
+    Poll for job result until completion or timeout
+    """
+    result_url = f"http://127.0.0.1:1108/api/v1/crawler/card-list/{job_id}"
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        response = requests.get(result_url)
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        time.sleep(interval)
+
+    raise TimeoutError(f"Timeout waiting for job {job_id}")
 
 @pytest.mark.parametrize(
     ("bank_code, bank_url"),
@@ -38,17 +56,18 @@ import pytest
     ]
 )
 def test_bank_has_cards(bank_code, bank_url):
-    api_url = "http://127.0.0.1:1108/api/v1/crawler/cards"
+    api_url = "http://127.0.0.1:1108/api/v1/crawler/card-list"
 
-    response = requests.get(api_url, params={"bank_code": bank_code, "url": bank_url})
+    response = requests.post(api_url, params={"bank_code": bank_code, "url": bank_url})
     response.raise_for_status()
-    data = response.json()
+    
+    job_data = response.json()
+    job_id = job_data["data"]["job_id"]
 
-    if not data.get("data") or not data["data"].get("pages"):
-        raise ValueError(f"'{bank_code}' pages is empty!")
+    result_data = wait_for_result(job_id)
 
-    bank_name = data["data"]["bank_name"]
-    pages = data["data"]["pages"]
+    bank_name = result_data["data"]["bank_name"]
+    pages = result_data["data"]["pages"]
     results = []
 
     for page in pages:
@@ -62,4 +81,4 @@ def test_bank_has_cards(bank_code, bank_url):
                 "bank_code": bank_code
             })
 
-    assert len(results) > 0, f"{bank_code} 無卡片資料"
+    assert len(results) > 0, f"{bank_code} has no cards information."

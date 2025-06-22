@@ -1,15 +1,17 @@
+import os
 import sys
 import logging
 import json
 import multiprocessing
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
-from app.api_service.schemas.base import BaseResponse
+from app.api_service.schemas.base import BaseResponse, JobIDResponse
 from app.crawler.schemas.card_list import CardItem, CardPagesItem, BankCardListPageData
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic import settings as project_settings
@@ -43,43 +45,68 @@ def load_scrapy_settings() -> Settings:
 
 SCRAPY_SETTINGS: Settings = load_scrapy_settings()
 
-def run_spider(config_path: str, bank_code: str, url: str):
+def run_card_list_spider(config_path: str, bank_code: str, url: str, file_name: str):
     """
     Initializes and runs the Scrapy spider in a separate process.
     This function is intended to be the target of a multiprocessing.Process.
 
     Args:
-        spider_config_path: Path to the configuration file (e.g., banks.yaml) to be used by the spider.
-        target_url: The URL the spider should start crawling.
+        config_path: Path to the configuration file (e.g., banks.yaml) to be used by the spider.
+        bank_code: The code of the bank to be crawled.
+        url: The URL the spider should start crawling.
+        file_name: The name of the file to write the results to.
     """
     try:
+        logger.info(f"Start crawling all card information from '{url}', bank code: '{bank_code}'.")
+        logger.info(f"The crawl result will be saved to '{file_name}'.jsonl.")
+        
         process = CrawlerProcess(SCRAPY_SETTINGS)
-        process.crawl(CardListSpider, config_path=config_path, bank_code=bank_code, url=url)
+        process.crawl(CardListSpider, config_path=config_path, bank_code=bank_code, url=url, file_name=file_name)
         process.start()
-    except Exception as e:
-        logger.error(f"Error occurred while running the spider: {e}")
 
-@router.get("/cards")
+        logger.info(f"Crawling completed.")
+    except Exception as e:
+        raise
+
+@router.post("/card-list")
 async def crawl_card_list(bank_code: str, url: str):
     """ 
     Start crawling all card information from the provided URL. 
     """
-    logger.info(f"Start crawling all card information from '{url}', bank code: '{bank_code}'")
+    file_name = str(uuid4())
 
-    p = multiprocessing.Process(target=run_spider, args=(CONFIG_PATH, bank_code, url))
-    p.start()
-    p.join()
-
-    logger.info(f"Crawling completed.")
-
-    # read the JSONL file and return the data
-    base_response = BaseResponse[BankCardListPageData]()
     try:
-        crawler_file_path = f"{global_settings.CRAWLER_DATA_DIR}/{bank_code}/card_list.jsonl"
+        p = multiprocessing.Process(target=run_card_list_spider, args=(CONFIG_PATH, bank_code, url, file_name))
+        p.start()        
+
+        response = BaseResponse[JobIDResponse](
+            status="success",
+            message="The crawling job has been submitted successfully.",
+            data=JobIDResponse(job_id=file_name)
+        )
+        return JSONResponse(content=response.model_dump(), status_code=202)
+    except Exception as e:
+        logger.error(f"Error occurred while running the spider: {e}.")
+        
+        response = BaseResponse[JobIDResponse](
+            status="fail",
+            message="Errors during crawling.",
+            error=str(e)
+        )
+        return JSONResponse(content=response.model_dump(), status_code=400)
+
+
+@router.get("/card-list/{list_id}")
+async def crawl_card_info(list_id: str):
+    try:
+        card_list_file_path = next(Path(global_settings.CRAWLER_DATA_DIR).rglob(f"{list_id}.jsonl"))
+
+        if os.stat(card_list_file_path).st_size == 0:
+            raise ValueError("The crawl has not yet completed or errors occurred during the crawl.")
         
         # remove duplicates
         cleaned_item = []
-        with open(crawler_file_path, "r") as f:
+        with open(card_list_file_path, "r") as f:
             cards = set()
             for line in f:
                 json_data = json.loads(line)
@@ -105,28 +132,40 @@ async def crawl_card_list(bank_code: str, url: str):
             else:
                 page_map[page_url].cards.append(card)
         
-        base_response.data = BankCardListPageData(
-            bank_code=bank_code, 
-            bank_name=bank_name, 
-            pages=list(page_map.values())
+        response = BaseResponse[BankCardListPageData](
+            status="success",
+            message = f"Successfully crawled all card information.",
+            data = BankCardListPageData(
+                bank_code=bank_code, 
+                bank_name=bank_name, 
+                pages=list(page_map.values())
+            )
         )
-
-        base_response.status = "success"
-        base_response.message = f"Successfully crawled all card information."
-        return JSONResponse(content=base_response.model_dump(), status_code=200)
+        return JSONResponse(content=response.model_dump(), status_code=200)
     except FileNotFoundError as e:
-        logger.error(f"File not found: {crawler_file_path}")
+        logger.error(f"File not found: {card_list_file_path}")
 
-        base_response.status = "fail"
-        base_response.message = f"Error occurred while reading the JSONL file."
-        base_response.error = f"{e}"
-        base_response.data = None
-        return JSONResponse(content=base_response.model_dump(), status_code=500)
+        response = BaseResponse(
+            status="fail",
+            message = f"File not found: {card_list_file_path}",
+            error = f"{e}"
+        )
+        return JSONResponse(content=response.model_dump(), status_code=400)
+    except ValueError as e:
+        logger.error(f"Error occurred while reading the JSONL file: {e}")
+        response = BaseResponse(
+            status="fail",
+            message = f"Error occurred while reading the JSONL file.",
+            error = f"{e}"
+        )
+        return JSONResponse(content=response.model_dump(), status_code=400)
     except Exception as e:
         logger.error(f"Error occurred while reading the JSONL file: {e}")
 
-        base_response.status = "fail"
-        base_response.message = f"Error occurred while reading the JSONL file."
-        base_response.error = f"{e}"
-        base_response.data = None
-        return JSONResponse(content=base_response.model_dump(), status_code=500)
+        response = BaseResponse(
+            status="fail",
+            message = f"Error occurred while reading the JSONL file.",
+            error = f"{e}"
+        )
+        return JSONResponse(content=response.model_dump(), status_code=500)
+

@@ -12,10 +12,11 @@ from app.crawler.schemas.bank_config import BankCrawlerConfig
 class CardListSpider(scrapy.Spider):
     name = "card_list_spider"
 
-    def __init__(self, config_path: str, bank_code: str, url: str, *args, **kwargs):
+    def __init__(self, config_path: str, bank_code: str, url: str, file_name: str, *args, **kwargs):
         super(CardListSpider, self).__init__(*args, **kwargs)
         self.start_urls = [url]
         self.bank_code = bank_code
+        self.file_name = file_name
         self.bank_config = BankCrawlerConfig(**get_config(config_path)).get_bank_config(bank_code)
 
     def parse(self, response: HtmlResponse):

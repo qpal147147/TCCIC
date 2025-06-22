@@ -10,5 +10,11 @@ class BaseResponse(BaseModel, Generic[DataT]):
     """
     status: Literal["success", "fail"] = "fail"
     message: str = ""
-    error: Optional[str] = None
     data: Optional[DataT] = None
+    error: Optional[str] = None
+
+class JobIDResponse(BaseModel):
+    """
+    Job ID response schema
+    """
+    job_id: str
