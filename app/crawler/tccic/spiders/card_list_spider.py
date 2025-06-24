@@ -1,7 +1,5 @@
-import re
 import scrapy
 from scrapy.http.response.html import HtmlResponse
-from scrapy_playwright.page import PageMethod
 from playwright.async_api import Page
 from twisted.python.failure import Failure
 

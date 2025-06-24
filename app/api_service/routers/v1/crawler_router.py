@@ -11,9 +11,11 @@ from fastapi.responses import JSONResponse
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
-from app.api_service.schemas.base import BaseResponse, JobIDResponse
+from app.api_service.schemas.base_schema import BaseResponse, JobIDResponse
+from app.api_service.schemas.crawler_schema import CardListRequest, CardFeatureRequest
 from app.crawler.schemas.card_list import CardItem, CardPagesItem, BankCardListPageData
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
+from app.crawler.tccic.spiders.card_feature_spider import CardFeatureSpider
 from app.crawler.tccic import settings as project_settings
 from app.configs.global_settings import global_settings
 from app.utils.logger_setup import LOG_FORMAT, LOG_DIR, LOG_FILENAME
@@ -47,7 +49,7 @@ SCRAPY_SETTINGS: Settings = load_scrapy_settings()
 
 def run_card_list_spider(config_path: str, bank_code: str, url: str, file_name: str):
     """
-    Initializes and runs the Scrapy spider in a separate process.
+    Initializes and runs the Scrapy spider in a separate process.  
     This function is intended to be the target of a multiprocessing.Process.
 
     Args:
@@ -68,15 +70,41 @@ def run_card_list_spider(config_path: str, bank_code: str, url: str, file_name: 
     except Exception as e:
         raise
 
+def run_card_feature_spider(config_path: str, bank_code: str, card_name: str, card_url: str, file_name: str):
+    """
+    Initializes and runs the Scrapy spider in a separate process.  
+    This function is intended to be the target of a multiprocessing.Process.
+
+    Args:
+        config_path: Path to the configuration file (e.g., banks.yaml) to be used by the spider.
+        bank_code: The code of the bank to be crawled.
+        card_name: The name of the card to be crawled.
+        card_url: The URL the spider should start crawling.
+        file_name: The name of the file to write the results to.
+    """
+
+    try:
+        logger.info(f"Start crawling all card information from '{card_url}', bank code: '{bank_code}', card name: '{card_name}'.")
+        logger.info(f"The crawl result will be saved to '{file_name}'.jsonl.")
+        
+        process = CrawlerProcess(SCRAPY_SETTINGS)
+        process.crawl(CardFeatureSpider, config_path, bank_code, card_name, card_url, file_name)
+        process.start()
+
+        logger.info(f"Crawling completed.")
+    except Exception as e:
+        raise
+
+
 @router.post("/card-list")
-async def crawl_card_list(bank_code: str, url: str):
+async def crawl_card_list(request: CardListRequest):
     """ 
     Start crawling all card information from the provided URL. 
     """
     file_name = str(uuid4())
 
     try:
-        p = multiprocessing.Process(target=run_card_list_spider, args=(CONFIG_PATH, bank_code, url, file_name))
+        p = multiprocessing.Process(target=run_card_list_spider, args=(CONFIG_PATH, request.bank_code, request.url, file_name))
         p.start()        
 
         response = BaseResponse[JobIDResponse](
@@ -97,7 +125,7 @@ async def crawl_card_list(bank_code: str, url: str):
 
 
 @router.get("/card-list/{list_id}")
-async def crawl_card_info(list_id: str):
+async def get_card_list(list_id: str):
     try:
         card_list_file_path = next(Path(global_settings.CRAWLER_DATA_DIR).rglob(f"{list_id}.jsonl"))
 
@@ -169,3 +197,36 @@ async def crawl_card_info(list_id: str):
         )
         return JSONResponse(content=response.model_dump(), status_code=500)
 
+
+@router.post("/card-feature")
+async def crawl_card_info(request: CardFeatureRequest):
+    """
+    Start crawling card feature information from the provided URL.
+    And save the result to the vector database.
+    """
+    file_name = str(uuid4())
+
+    try:
+        p = multiprocessing.Process(target=run_card_feature_spider, args=(CONFIG_PATH, request.bank_code, request.card_name, request.card_url, file_name))
+        p.start()        
+
+        response = BaseResponse[JobIDResponse](
+            status="success",
+            message="The crawling job has been submitted successfully.",
+            data=JobIDResponse(job_id=file_name)
+        )
+        return JSONResponse(content=response.model_dump(), status_code=202)
+    except Exception as e:
+        logger.error(f"Error occurred while running the spider: {e}.")
+        
+        response = BaseResponse[JobIDResponse](
+            status="fail",
+            message="Errors during crawling.",
+            error=str(e)
+        )
+        return JSONResponse(content=response.model_dump(), status_code=400)
+
+
+@router.get("/card-feature/{card_id}")
+async def get_card_info(card_id: str):
+    ...
