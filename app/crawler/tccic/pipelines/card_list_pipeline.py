@@ -13,6 +13,11 @@ from app.configs.global_settings import global_settings
 
 class CardListPipeline:
     def open_spider(self, spider):
+        self.enabled = (spider.name == 'card_list_spider')
+
+        if not self.enabled:
+            return 
+        
         self.bank_code = getattr(spider, 'bank_code', "unknown")
         self.file_name = getattr(spider, 'file_name')
         if self.bank_code == "unknown":
@@ -33,12 +38,18 @@ class CardListPipeline:
             raise
     
     def close_spider(self, spider):
+        if not self.enabled:
+            return
+        
         if self.file:
             self.file.writelines("\n".join(self.data))
             self.file.close()
             spider.logger.info(f"The file has been saved to {self.json_path}")
 
     def process_item(self, item, spider):
+        if not self.enabled:
+            return
+        
         if self.file:
             item = json.dumps(ItemAdapter(item).asdict(), ensure_ascii=False)
             self.data.append(item)

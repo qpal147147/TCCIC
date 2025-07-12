@@ -63,6 +63,7 @@ DEFAULT_REQUEST_HEADERS = {
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'tccic.pipelines.card_list_pipeline.CardListPipeline': 300,
+    'tccic.pipelines.card_feature_pipeline,.CardFeaturePipeline': 400,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)

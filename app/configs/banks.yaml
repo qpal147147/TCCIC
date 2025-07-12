@@ -8,11 +8,14 @@ banks:
       division: .//li[@class="ul-li-items" and @itemprop="itemListElement"]
       card:
         title: .//p[@itemprop="name"]/text()
-        # If the card url is the current url, fill in "tab_url"
+        # If the card url is the same as the tab url, fill in "tab_url"
         url: .//a[@itemprop="url"]/@href
-        # If necessary, add more xpath to avoid matching without results
+        # The column is used to capture the area of interested in the page
+        # You can define more xpaths to capture the area of interest
         content:
-          - //*[@id="centercontainer"]/div
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
   
   - bank_code: dbs
     bank_name: 星展銀行
