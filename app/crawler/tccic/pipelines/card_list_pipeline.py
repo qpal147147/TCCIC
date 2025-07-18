@@ -47,10 +47,7 @@ class CardListPipeline:
             spider.logger.info(f"The file has been saved to {self.json_path}")
 
     def process_item(self, item, spider):
-        if not self.enabled:
-            return
-        
-        if self.file:
+        if self.enabled and self.file and item is not None:
             item = json.dumps(ItemAdapter(item).asdict(), ensure_ascii=False)
             self.data.append(item)
 

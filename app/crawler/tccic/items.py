@@ -5,7 +5,7 @@
 
 import scrapy
 
-class CardsItem(scrapy.Item):
+class CardItem(scrapy.Item):
     """
     CardsItem
     """
@@ -14,3 +14,10 @@ class CardsItem(scrapy.Item):
     page_url = scrapy.Field()
     card_title = scrapy.Field()
     card_url = scrapy.Field()
+
+class FeatureItem(scrapy.Item):
+    """
+    FeatureItem
+    """
+    page_url = scrapy.Field()
+    image_path = scrapy.Field()

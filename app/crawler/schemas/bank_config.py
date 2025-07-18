@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 from pydantic import BaseModel
 
 class CardItemXPath(BaseModel):
@@ -7,7 +7,6 @@ class CardItemXPath(BaseModel):
     """
     title: str
     url: str
-    content: List[str]
 
 class PageXPaths(BaseModel):
     """
@@ -17,6 +16,17 @@ class PageXPaths(BaseModel):
     division: Optional[str]
     card: CardItemXPath
 
+class FeatureXpaths(BaseModel):
+    """
+    Feature xpaths schema
+    """
+    card_code: str
+    cookie_button: Optional[str]
+    focus_content: Optional[list[str]]
+    link_button: str
+    sub_focus_content: Optional[list[str]]
+    close_button: Optional[str]
+
 class BankConfig(BaseModel):
     """
     Bank schema
@@ -25,12 +35,22 @@ class BankConfig(BaseModel):
     bank_name: str
     is_dynamic: bool
     xpaths: PageXPaths
+    features: list[FeatureXpaths]
+
+    def get_feature_config(self, card_url: str) -> Optional[FeatureXpaths]:
+        """
+        Get feature config by card code
+        """
+        for feature in self.features:
+            if feature.card_code in card_url:
+                return feature
+        return None
 
 class BankCrawlerConfig(BaseModel):
     """
     Banks config schema
     """
-    banks: List[BankConfig]
+    banks: list[BankConfig]
 
     def get_bank_config(self, bank_code: str) -> Optional[BankConfig]:
         """

@@ -3,7 +3,7 @@ from scrapy.http.response.html import HtmlResponse
 from playwright.async_api import Page
 from twisted.python.failure import Failure
 
-from app.crawler.tccic.items import CardsItem
+from app.crawler.tccic.items import CardItem
 from app.utils.config_utils import get_config
 from app.crawler.schemas.bank_config import BankCrawlerConfig
 
@@ -175,7 +175,7 @@ class CardListSpider(scrapy.Spider):
                 continue
 
             self.logger.info(f"Found card: {card_title}")
-            yield CardsItem(
+            yield CardItem(
                 bank_name = self.bank_config.bank_name,
                 bank_code = self.bank_config.bank_code,
                 page_url = response.url,
