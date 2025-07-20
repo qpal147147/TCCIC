@@ -3,12 +3,17 @@ banks:
     bank_name: 台新銀行
     is_dynamic: False
     xpaths:
-      # if no tab, no need to fill in
+      # This field is used to retrieve information from each card in the list:
+      # tab_link (str): Used to locate the tab section that categorizes cards on the page. 
+      #                 For example, if the page contains tabbed categories, this parameter is used to capture the link for each tab and automatically navigate to the corresponding URL.
+      #                 If the webpage is static, it should capture the link; otherwise, it should capture the entire content block. 
+      #                 If the webpage does not have a tab section, set this value to null or leave it empty.
+      # division (str): Used to locate the area on the page where each card is situated.
+      # card (str): Used to extract the title and url of each card. If the url is the same as the tab_link, set its value to the string "tab_url".
       tab_link: //ul[@class="nav nav-tabs  tab-sty-1"]/li/a/@href
       division: .//li[@class="ul-li-items" and @itemprop="itemListElement"]
       card:
         title: .//p[@itemprop="name"]/text()
-        # If the card url is the same as the tab url, fill in "tab_url"
         url: .//a[@itemprop="url"]/@href
     features:
       # Each field in this list defines information extraction rules for a specific page.
@@ -25,29 +30,326 @@ banks:
           - //div[@id="ts-comp-41-collapse-2"]
           - //div[@id="ts-comp-41-collapse-3"]
         link_button: .//a
-        sub_focus_content: null
+        sub_focus_content:
         close_button: 
 
-  # - bank_code: dbs
-  #   bank_name: 星展銀行
-  #   is_dynamic: False
-  #   xpaths:
-  #     tab_link: 
-  #     division: .//div[@data-card]
-  #     card:
-  #       title: ./div/div/div[1]//text()
-  #       url: ./div/div/div[1]//@href
-  #       content: 
-  #         - (//div[@class="page-container"]//div[contains(@class, "box box_02")])[2]
-  #         - //ul[contains(@class, "slider-for")]//ul[@class="slick-dots"]/li
-  #         - //div[@class="tabs-container"]
-  #         - //div[@class="message "]
-  #         - //section[@class="product"]
-  #         - //div[@class="sc-v79fs9 gZUABD"]
-  #       sub_content: 
-  #         - .//div[@class='mobilepopup-inner']
-  #         - //div[@class="slider slider03"]
-  #         - //div[@class="modal-body"]
+      - card_code: cg021
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg018
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg040
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg045
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg042
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg007
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg009
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg023
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg038
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg019
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg008
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg010
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg012
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg013
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg035
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg001
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//li
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg004
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg005
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg014
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg006
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg002
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg039
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg011
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg043
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg003
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg034
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg041
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg029
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg030
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-2"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg015
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+          - //div[@id="ts-comp-41-collapse-3"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg028
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+      - card_code: cg024
+        cookie_button: //button[contains(@class, 'cookie')]
+        focus_content:
+          - //div[@class="ts-comp-40-1 no-border-bottom"]
+        link_button: .//a
+        sub_focus_content:
+        close_button: 
+
+  - bank_code: dbs
+    bank_name: 星展銀行
+    is_dynamic: False
+    xpaths:
+      tab_link: 
+      division: .//div[@data-card]
+      card:
+        title: ./div/div/div[1]//text()
+        url: ./div/div/div[1]//@href
+    features:
+      - card_code: everyday
+        cookie_button: 
+        focus_content:
+          - (//div[@class="box box_02"])[2]
+          - //div[@id="page04"]//ul
+        link_button: .//a
+        sub_focus_content:
+          - //div[@class="mobilepopup-inner"]//div[@class="content"]
+        close_button: //a[@class="button-close close"]
   
   # - bank_code: cathaybk
   #   bank_name: 國泰世華

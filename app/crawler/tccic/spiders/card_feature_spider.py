@@ -65,7 +65,7 @@ class CardFeatureSpider(scrapy.Spider):
             yield FeatureItem(page_url=response.url, image_path=str(image_dir / f"main.png"))
 
             for i, focus_content_xpath in enumerate(self.feature_config.focus_content):
-                all_focus_content_locators = page.locator(focus_content_xpath)
+                all_focus_content_locators = page.locator(f"xpath={focus_content_xpath}")
 
                 if await all_focus_content_locators.count() == 0:
                     self.logger.warning(f"The content xpath: {focus_content_xpath} does not exist in page: {response.url}.")
@@ -114,16 +114,14 @@ class CardFeatureSpider(scrapy.Spider):
                                 # Case 2: Current page redirection
                                 self.logger.info(f"Redirect to new URL: {page.url}.")
                                 await page.screenshot(path=image_path, full_page=True)
+                                yield FeatureItem(page_url=page.url, image_path=image_path)
 
                                 await page.go_back(wait_until="load")
 
-                                self.logger.info("Retrieve links from the page...")
-                                focus_content_locator = page.locator(focus_content_locator)
-                                all_link_locators = await focus_content_locator.locator(f"xpath={self.feature_config.link_button}").all()
-                                self.logger.info(f"Reacquired {len(all_link_locators)} links.")
-
-                                yield FeatureItem(page_url=page.url, image_path=image_path)
-                        
+                                # self.logger.info("Retrieve links from the page...")
+                                # focus_content_locator = page.locator(f"xpath={focus_content_locator}")
+                                # all_link_locators = await focus_content_locator.locator(f"xpath={self.feature_config.link_button}").all()
+                                # self.logger.info(f"Reacquired {len(all_link_locators)} links.")
                             else:
                                 # Case 3: Current page update
                                 self.logger.info(f"The page is currently updated, but the URL has not changed.")
@@ -139,8 +137,8 @@ class CardFeatureSpider(scrapy.Spider):
                                                 screenshot_flag = True
                                                 break
 
-                                    if screenshot_flag:
-                                        break
+                                        if screenshot_flag:
+                                            break
                                 
                                 if not screenshot_flag:
                                     await focus_content_locator.screenshot(path=image_path)
@@ -159,7 +157,7 @@ class CardFeatureSpider(scrapy.Spider):
                             await page.reload(wait_until="load")
 
                             await self.scroll_to_bottom(page)
-                            focus_content_locator = page.locator(focus_content_xpath)
+                            focus_content_locator = page.locator(f"xpath={focus_content_xpath}")
                             all_link_locators = await focus_content_locator.locator(f"xpath={self.feature_config.link_button}").all()
 
                         finally:
