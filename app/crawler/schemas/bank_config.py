@@ -23,7 +23,7 @@ class FeatureXpaths(BaseModel):
     card_code: str
     cookie_button: Optional[str]
     focus_content: Optional[list[str]]
-    link_button: str
+    link_button: Optional[str]
     sub_focus_content: Optional[list[str]]
     close_button: Optional[str]
 

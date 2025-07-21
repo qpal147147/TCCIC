@@ -89,7 +89,7 @@ class CardFeatureSpider(scrapy.Spider):
                             self.logger.warning(f"The link {k} is hidden, skipping click.")
                             continue
 
-                        original_url = page.url
+                        original_url = page.url.split("#")[0]
                         new_page = None
                         try:
                             async with page.context.expect_page(timeout=3000) as new_page_info:
@@ -110,7 +110,7 @@ class CardFeatureSpider(scrapy.Spider):
                             self.logger.info("New page not found, process the current page.")
                             await page.wait_for_load_state("load")
                             
-                            if page.url != original_url:
+                            if page.url.split("#")[0] != original_url:
                                 # Case 2: Current page redirection
                                 self.logger.info(f"Redirect to new URL: {page.url}.")
                                 await page.screenshot(path=image_path, full_page=True)
