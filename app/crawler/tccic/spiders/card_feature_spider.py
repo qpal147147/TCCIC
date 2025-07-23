@@ -27,17 +27,19 @@ class CardFeatureSpider(scrapy.Spider):
             self.logger.error(f"No bank config found for bank code: {self.bank_code}")
             return
         
+        self.logger.info(f"Card code: {self.feature_config.card_code}")
+
         yield scrapy.Request(
             url=response.url,
             meta={
                 "playwright": True,
                 "playwright_include_page": True,
-                "playwright_context_kwargs": {
-                    "viewport": {
-                        "width": 1280,
-                        "height": 1080,
-                    }
-                }
+                # "playwright_context_kwargs": {
+                #     "viewport": {
+                #         "width": 1280,
+                #         "height": 1080,
+                #     }
+                # }
             },
             callback=self.parse_dynamic_page,
             errback=self.errback_httpbin,
@@ -64,18 +66,22 @@ class CardFeatureSpider(scrapy.Spider):
             await page.screenshot(path=(image_dir / f"main.png"), full_page=True)
             yield FeatureItem(page_url=response.url, image_path=str(image_dir / f"main.png"))
 
-            for i, focus_content_xpath in enumerate(self.feature_config.focus_content):
-                all_focus_content_locators = page.locator(f"xpath={focus_content_xpath}")
+            if self.feature_config.focus is None:
+                self.logger.warning(f"No focus config found for bank code: {self.bank_code}")
+                return
+            
+            for i, focus_item in enumerate(self.feature_config.focus):
+                all_focus_content_locators = page.locator(f"xpath={focus_item.content}")
 
                 if await all_focus_content_locators.count() == 0:
-                    self.logger.warning(f"The content xpath: {focus_content_xpath} does not exist in page: {response.url}.")
+                    self.logger.warning(f"The content xpath: {focus_item.content} does not exist in page: {response.url}.")
                     continue
 
                 for j, focus_content_locator in enumerate(await all_focus_content_locators.all()):
                     # get all links in the content
-                    all_link_locators = await focus_content_locator.locator(f"xpath={self.feature_config.link_button}").all()
+                    all_link_locators = await focus_content_locator.locator(f"xpath={focus_item.link}").all()
 
-                    self.logger.info(f"Found {len(all_link_locators)} links in content: {focus_content_xpath}, {j+1}th.")
+                    self.logger.info(f"Found {len(all_link_locators)} links in content: {focus_item.content}, {j+1}th.")
 
                     for k, link_locator in enumerate(all_link_locators):
                         image_path = str(image_dir / f"{i}{j}{k}.png")
@@ -95,7 +101,8 @@ class CardFeatureSpider(scrapy.Spider):
                             async with page.context.expect_page(timeout=3000) as new_page_info:
                                 # await focus_content_locator.wait_for(timeout=500)
                                 await link_locator.highlight()
-                                await link_locator.click(force=True, timeout=3000)
+                                await link_locator.evaluate("el => el.click()")
+                                # await link_locator.click(force=True, timeout=3000)
                         
                             # Case 1: Open a new page
                             new_page = await new_page_info.value
@@ -157,8 +164,8 @@ class CardFeatureSpider(scrapy.Spider):
                             await page.reload(wait_until="load")
 
                             await self.scroll_to_bottom(page)
-                            focus_content_locator = page.locator(f"xpath={focus_content_xpath}")
-                            all_link_locators = await focus_content_locator.locator(f"xpath={self.feature_config.link_button}").all()
+                            focus_content_locator = page.locator(f"xpath={focus_item.content}")
+                            all_link_locators = await focus_content_locator.locator(f"xpath={focus_item.link}").all()
 
                         finally:
                             if new_page:

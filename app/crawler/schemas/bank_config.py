@@ -16,14 +16,20 @@ class PageXPaths(BaseModel):
     division: Optional[str]
     card: CardItemXPath
 
+class ContentXpath(BaseModel):
+    """
+    Content xpath schema
+    """
+    content: Optional[str]
+    link: Optional[str]
+
 class FeatureXpaths(BaseModel):
     """
     Feature xpaths schema
     """
     card_code: str
     cookie_button: Optional[str]
-    focus_content: Optional[list[str]]
-    link_button: Optional[str]
+    focus: Optional[list[ContentXpath]]
     sub_focus_content: Optional[list[str]]
     close_button: Optional[str]
 
