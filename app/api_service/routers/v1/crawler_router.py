@@ -123,16 +123,17 @@ async def crawl_card_list(request: CardListRequest):
     """ 
     Start crawling all card information from the provided URL. 
     """
-    file_name = str(uuid4())
+    job_id = str(uuid4())
+    list_id = f"list-{uuid4().hex}"
 
     try:
-        p = multiprocessing.Process(target=run_card_list_spider, args=(CONFIG_PATH, request.bank_code, request.url, file_name))
+        p = multiprocessing.Process(target=run_card_list_spider, args=(CONFIG_PATH, request.bank_code, request.url, list_id))
         p.start()        
 
         response = BaseResponse[JobIDResponse](
             status="success",
             message="The crawling job has been submitted successfully.",
-            data=JobIDResponse(job_id=file_name)
+            data=JobIDResponse(job_id=job_id, list_id=list_id)
         )
         return JSONResponse(content=response.model_dump(), status_code=202)
     except Exception as e:
@@ -226,27 +227,28 @@ async def crawl_card_info(request: CardFeatureRequest):
     Start crawling card feature information from the provided URL.
     And save the result to the vector database.
     """
-    file_name = str(uuid4())
+    job_id = str(uuid4())
+    card_id = f"card-{uuid4().hex}"
 
     try:
         # write job status
         job_status_txt_path = f"{global_settings.CRAWLER_DATA_DIR}/feature_job_status.txt"
-        write_job_status(job_status_txt_path, file_name, False)
+        write_job_status(job_status_txt_path, job_id, False)
 
         # start crawling
-        p = multiprocessing.Process(target=run_card_feature_spider, args=(CONFIG_PATH, request.bank_code, request.card_name, request.card_url, file_name))
+        p = multiprocessing.Process(target=run_card_feature_spider, args=(CONFIG_PATH, request.bank_code, request.card_name, request.card_url, card_id))
         p.start()        
 
         response = BaseResponse[JobIDResponse](
             status="success",
             message="The crawling job has been submitted successfully.",
-            data=JobIDResponse(job_id=file_name)
+            data=JobIDResponse(job_id=job_id, card_id=card_id)
         )
         return JSONResponse(content=response.model_dump(), status_code=202)
     except Exception as e:
         logger.error(f"Error occurred while running the spider: {e}.")
         
-        response = BaseResponse[JobIDResponse](
+        response = BaseResponse(
             status="fail",
             message="Errors during crawling.",
             error=str(e)
@@ -278,9 +280,10 @@ async def get_card_info(job_id: str):
     except Exception as e:
         logger.error(f"Error occurred while getting the job status: {e}")
 
-        response = BaseResponse[CardFeatureResponse](
+        response = BaseResponse(
             status="fail",
             message="Error occurred while getting the job status.",
             error=str(e)
         )
         return JSONResponse(content=response.model_dump(), status_code=400)
+

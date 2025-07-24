@@ -18,3 +18,5 @@ class JobIDResponse(BaseModel):
     Job ID response schema
     """
     job_id: str
+    list_id: Optional[str] = None
+    card_id: Optional[str] = None
