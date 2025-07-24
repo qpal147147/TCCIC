@@ -12,7 +12,7 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
 from app.api_service.schemas.base_schema import BaseResponse, JobIDResponse
-from app.api_service.schemas.crawler_schema import CardListRequest, CardFeatureRequest
+from app.api_service.schemas.crawler_schema import CardListRequest, CardFeatureRequest, CardFeatureResponse
 from app.crawler.schemas.card_list import CardItem, CardPagesItem, BankCardListPageData
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic.spiders.card_feature_spider import CardFeatureSpider
@@ -29,6 +29,7 @@ sys.path.append(str(SCRAPY_PROJECT_PATH))
 
 router = APIRouter()
 
+### Scrapy settings ###
 def load_scrapy_settings() -> Settings:
     """
     Loads Scrapy project settings from the project_settings module.
@@ -47,6 +48,7 @@ def load_scrapy_settings() -> Settings:
 
 SCRAPY_SETTINGS: Settings = load_scrapy_settings()
 
+### Spider functions ###
 def run_card_list_spider(config_path: str, bank_code: str, url: str, file_name: str):
     """
     Initializes and runs the Scrapy spider in a separate process.  
@@ -95,7 +97,27 @@ def run_card_feature_spider(config_path: str, bank_code: str, card_name: str, ca
     except Exception as e:
         raise
 
+def write_job_status(txt_path: str, job_id: str, status: bool):
+    Path(txt_path).touch(exist_ok=True)
 
+    with open(txt_path, "r+", encoding="utf-8") as f:
+        lines = f.readlines()
+        f.seek(0)
+
+        found = False
+        for i, line in enumerate(lines):
+            if line.startswith(job_id):
+                lines[i] = f"{job_id},{status}\n"
+                found = True
+                break
+        
+        if not found:
+            lines.append(f"{job_id},{status}\n")
+
+        f.writelines(lines)
+
+
+### API endpoints ###
 @router.post("/card-list")
 async def crawl_card_list(request: CardListRequest):
     """ 
@@ -207,6 +229,11 @@ async def crawl_card_info(request: CardFeatureRequest):
     file_name = str(uuid4())
 
     try:
+        # write job status
+        job_status_txt_path = f"{global_settings.CRAWLER_DATA_DIR}/feature_job_status.txt"
+        write_job_status(job_status_txt_path, file_name, False)
+
+        # start crawling
         p = multiprocessing.Process(target=run_card_feature_spider, args=(CONFIG_PATH, request.bank_code, request.card_name, request.card_url, file_name))
         p.start()        
 
@@ -227,6 +254,33 @@ async def crawl_card_info(request: CardFeatureRequest):
         return JSONResponse(content=response.model_dump(), status_code=400)
 
 
-@router.get("/card-feature/{card_id}")
-async def get_card_info(card_id: str):
-    ...
+@router.get("/card-feature/{job_id}/status")
+async def get_card_info(job_id: str):
+    try:
+        logger.info(f"Query job status: {job_id}")
+
+        job_status_txt_path = f"{global_settings.CRAWLER_DATA_DIR}/feature_job_status.txt"
+
+        with open(job_status_txt_path, "r") as f:
+            for line in f:
+                fjob_id, fjog_status = line.strip().split(",")
+                if fjob_id == job_id:
+                    response = BaseResponse[CardFeatureResponse](
+                        status="success",
+                        message="Query job status successfully.",
+                        data=CardFeatureResponse(job_status=fjog_status)
+                    )
+                    return JSONResponse(content=response.model_dump(), status_code=200)
+        
+        # if not found, it will raise
+        raise ValueError(f"Job {job_id} not found.")
+    
+    except Exception as e:
+        logger.error(f"Error occurred while getting the job status: {e}")
+
+        response = BaseResponse[CardFeatureResponse](
+            status="fail",
+            message="Error occurred while getting the job status.",
+            error=str(e)
+        )
+        return JSONResponse(content=response.model_dump(), status_code=400)
