@@ -7,8 +7,10 @@ scrapy-playwright-stealth
 # playwright install
 
 # RAG
+google-genai    # gemini
 
 # general
+numpy
 pydantic-settings
 pyyaml
 fastapi[standard]

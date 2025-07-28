@@ -1,43 +1,43 @@
-from typing import Literal, Optional, Dict, Any
+from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class BaseConfig(BaseModel):
-    """Base config"""
+class BaseModelConfig(BaseModel):
+    """Base model config"""
     api_key: SecretStr
-    llm_model_name: str
+    chat_model_name: str
     temperature: float
     max_tokens: int
     embedding_model_name: str
     gpu: bool
 
 
-class OpenAIConfig(BaseConfig):
+class OpenAIConfig(BaseModelConfig):
     """OpenAI model config"""
     api_key: SecretStr
-    llm_model_name: str = "gpt-4o"
+    chat_model_name: str = "gpt-4o"
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "text-embedding-3-large"
     gpu: bool = False
 
 
-class GeminiConfig(BaseConfig):
+class GeminiConfig(BaseModelConfig):
     """Gemini model config"""
     api_key: SecretStr
-    llm_model_name: str = "gemini-2.0-flash"
+    chat_model_name: str = "gemini-2.0-flash"
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "gemini-embedding-001"
     gpu: bool = False
 
 
-class HuggingFaceConfig(BaseConfig):
+class HuggingFaceConfig(BaseModelConfig):
     """HuggingFace model config"""
     api_key: SecretStr
-    llm_model_name: str = "Qwen/Qwen3-8B"
+    chat_model_name: str = "Qwen/Qwen3-8B"
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "intfloat/multilingual-e5-large"
@@ -58,7 +58,7 @@ class GlobalSettings(BaseSettings):
     """Global settings for the application"""
     # LLM settings
     ACTIVE_LLM_PROVIDER: Literal["openai", "gemini", "huggingface"] = "gemini"
-    ACTIVE_EMBEDDING_PROVIDER: Literal["openai", "gemini", "huggingface"] = "openai"
+    ACTIVE_EMBEDDING_PROVIDER: Literal["openai", "gemini", "huggingface"] = "gemini"
 
     # API keys
     OPENAI_API_KEY: SecretStr
@@ -80,24 +80,24 @@ class GlobalSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    def get_active_llm_config(self) -> BaseConfig:
+    def get_active_llm_config(self) -> BaseModelConfig:
         """get the active llm config"""
         provider_map = {
-            "openai": OpenAIConfig(api_key=self.OPENAI_API_KEY.get_secret_value()),
-            "gemini": GeminiConfig(api_key=self.GEMINI_API_KEY.get_secret_value()),
-            "huggingface": HuggingFaceConfig(api_key=self.HF_API_KEY.get_secret_value()),
+            "openai": OpenAIConfig(api_key=self.OPENAI_API_KEY),
+            "gemini": GeminiConfig(api_key=self.GEMINI_API_KEY),
+            "huggingface": HuggingFaceConfig(api_key=self.HF_API_KEY),
         }
         config = provider_map.get(self.ACTIVE_LLM_PROVIDER)
         if config is None:
             raise ValueError(f"Unsupported LLM Text Provider: {self.ACTIVE_LLM_PROVIDER}")
         return config
     
-    def get_active_embedding_config(self) -> BaseConfig:
+    def get_active_embedding_config(self) -> BaseModelConfig:
         """get the active embedding config"""
         provider_map = {
-            "openai": OpenAIConfig(api_key=self.OPENAI_API_KEY.get_secret_value()),
-            "gemini": GeminiConfig(api_key=self.GEMINI_API_KEY.get_secret_value()),
-            "huggingface": HuggingFaceConfig(api_key=self.HF_API_KEY.get_secret_value()),
+            "openai": OpenAIConfig(api_key=self.OPENAI_API_KEY),
+            "gemini": GeminiConfig(api_key=self.GEMINI_API_KEY),
+            "huggingface": HuggingFaceConfig(api_key=self.HF_API_KEY),
         }
         config = provider_map.get(self.ACTIVE_EMBEDDING_PROVIDER)
         if config is None:
@@ -107,5 +107,4 @@ class GlobalSettings(BaseSettings):
 global_settings = GlobalSettings()
 
 if __name__ == "__main__":
-    print(global_settings.get_active_embedding_config().api_key.get_secret_value())
-    # print(global_settings)
+    print(global_settings)
