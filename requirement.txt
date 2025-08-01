@@ -8,8 +8,11 @@ scrapy-playwright-stealth
 
 # RAG
 google-genai    # gemini
+lancedb         # vector database
 
 # general
+jieba
+pandas
 numpy
 pydantic-settings
 pyyaml

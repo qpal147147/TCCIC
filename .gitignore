@@ -1,6 +1,7 @@
 # custom file / directory
 logs/
 raw_json/
+lancedb/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

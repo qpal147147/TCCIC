@@ -15,13 +15,13 @@ class GeminiEmbedding(EmbeddingInterface):
         super().__init__(model_config)
         self.client = genai.Client(api_key=model_config.api_key.get_secret_value())
 
-    def create_embeddings(self, texts: list[str]) -> list[list[float]]:
+    def create_embeddings(self, texts: list[str], dim: int) -> list[list[float]]:
         result = self.client.models.embed_content(
             model=self.model_config.embedding_model_name,
             contents=texts,
             config=types.EmbedContentConfig(
                 task_type="SEMANTIC_SIMILARITY",
-                output_dimensionality=1536 # 3072, 1536, 768. https://ai.google.dev/gemini-api/docs/embeddings#control-embedding-size
+                output_dimensionality=dim # 3072, 1536, 768. https://ai.google.dev/gemini-api/docs/embeddings#control-embedding-size
             ),
         )
 

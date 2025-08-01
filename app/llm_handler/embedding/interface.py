@@ -22,9 +22,14 @@ class EmbeddingInterface(ABC):
 
 
     @abstractmethod
-    def create_embeddings(self, texts: list[str]) -> list[list[float]]:
+    def create_embeddings(self, texts: list[str], dim: int) -> list[list[float]]:
         """
         Generate embedding vectors for a set of texts.
         - texts: A list containing multiple strings.
+        - dim: Dimensionality of the embedding vectors.
+
+        The Dimensionality of each model:
+        - Gemini: 3072, 1536, 768
+        - OpenAI: 3072, 1536
         """
         pass
