@@ -94,6 +94,11 @@ def run_card_feature_spider(config_path: str, bank_code: str, card_name: str, ca
         process.start()
 
         logger.info(f"Crawling completed.")
+
+        feature_jsonl_path = Path(global_settings.CRAWLER_DATA_DIR) / bank_code / "card_feature" / file_name / f"{file_name}.jsonl"
+        logging.info(f"Find the feature jsonl file at {feature_jsonl_path}.")
+
+        
     except Exception as e:
         raise
 

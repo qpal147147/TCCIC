@@ -10,6 +10,7 @@ class EmbeddingInterface(ABC):
 
     def __init__(self, model_config: BaseModelConfig):
         self.model_config = model_config
+        self.embedding_dim = self.model_config.embedding_dim
         self.validate_config()
         
         
@@ -22,7 +23,7 @@ class EmbeddingInterface(ABC):
 
 
     @abstractmethod
-    def create_embeddings(self, texts: list[str], dim: int) -> list[list[float]]:
+    async def create_embeddings(self, texts: list[str], dim: int) -> list[list[float]]:
         """
         Generate embedding vectors for a set of texts.
         - texts: A list containing multiple strings.

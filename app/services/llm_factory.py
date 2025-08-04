@@ -1,5 +1,5 @@
-from app.llm_handler.chat.gemini import GeminiChat
-from app.llm_handler.embedding.gemini import GeminiEmbedding
+from app.services.chat.gemini import GeminiChat
+from app.services.embedding.gemini import GeminiEmbedding
 from app.configs.global_settings import global_settings
 
 class LLMFactory:

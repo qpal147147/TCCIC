@@ -11,6 +11,7 @@ class BaseModelConfig(BaseModel):
     temperature: float
     max_tokens: int
     embedding_model_name: str
+    embedding_dim: int
     gpu: bool
 
 
@@ -21,6 +22,7 @@ class OpenAIConfig(BaseModelConfig):
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "text-embedding-3-large"
+    embedding_dim: int = 3072
     gpu: bool = False
 
 
@@ -31,6 +33,7 @@ class GeminiConfig(BaseModelConfig):
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "gemini-embedding-001"
+    embedding_dim: int = 1536
     gpu: bool = False
 
 
@@ -41,6 +44,7 @@ class HuggingFaceConfig(BaseModelConfig):
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "intfloat/multilingual-e5-large"
+    embedding_dim: int = 1024
     gpu: bool = True
 
 

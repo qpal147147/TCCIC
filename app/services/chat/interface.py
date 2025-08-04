@@ -22,7 +22,7 @@ class ChatInterface(ABC):
         pass
 
     @abstractmethod
-    def chat(self, prompt: str, images: List[str]|None, structured_schema: Any|None) -> Any|str:
+    async def chat(self, prompt: str, images: List[str]|None, structured_schema: Any|None) -> Any|str:
         """
         Generate a response based on the given prompt and conversation history.
         - prompt: User input.
@@ -30,5 +30,14 @@ class ChatInterface(ABC):
         - structured_schema: Define a `Pydantic` model to specify the format that the language model should adhere to when producing text output.
 
         - Returns: If the `structured_schema` parameter is provided, the output will be a `structured_schema` object; otherwise, it will be a `string`.
+        """
+        pass
+
+    @abstractmethod
+    async def summary_docs(self, query: str, docs: List[str]) -> str:
+        """
+        Generate a summary based on the given prompt and documents.
+        - query: User input.
+        - docs: References used to summarize information.
         """
         pass
