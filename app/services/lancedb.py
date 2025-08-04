@@ -48,10 +48,15 @@ class lanceDBManager:
         except Exception:
             raise
 
-        self._fts_index_exist = any(
-            "tokenized_text" in index.columns
-            for index in self._table.list_indices() 
-        )
+        self._fts_index_exist = self._check_index_exists(self._table, "tokenized_text")
+
+
+    def _check_index_exists(self, table: lancedb.table.Table, column_name: str) -> bool:
+        for index in table.list_indices():
+            if column_name in index.columns:
+                return True
+        return False
+
 
     def _get_filter(
         self, 
@@ -65,6 +70,7 @@ class lanceDBManager:
         if bank_code and bank_code.strip():
             filters.append(f"bank_code = '{bank_code.strip()}'")
         return " AND ".join(filters) if filters else None
+
 
     def insert(
         self, 
@@ -94,6 +100,8 @@ class lanceDBManager:
         if not self._fts_index_exist:
             self._table.create_fts_index("tokenized_text", use_tantivy=False)
             self._table.wait_for_index(["tokenized_text_idx"])
+            self._fts_index_exist = True
+
 
     def delete_rows(
         self, 
@@ -107,7 +115,8 @@ class lanceDBManager:
         """
         self._table.delete(f'{key} = "{value}"')
 
-    def hybird_search(
+
+    def hybrid_search(
         self, 
         query: str, 
         vector:list[float], 
@@ -128,6 +137,13 @@ class lanceDBManager:
             The search results are returned in order of relevance, from highest to lowest.
             The returned result includes `text`, `url`, `card_id`, `card_name`, and `bank_code`.
         """
+        if not self._check_index_exists(self._table, "tokenized_text"):
+            return pd.DataFrame(
+                data=[],
+                columns=["text", "url", "card_id", "card_name", "bank_code"]
+            )
+        
+
         tokenized_query = " ".join(jieba.cut_for_search(query))
         query_builder = self._table.search(query_type="hybrid", vector_column_name="vector", fts_columns="tokenized_text")
         

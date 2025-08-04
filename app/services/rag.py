@@ -140,7 +140,7 @@ class RAG():
         bank_code: Optional[str] = None,
         top_k: int = 10
     ) -> LLMResponse:
-        results = self.vector_manager.hybird_search(
+        results = self.vector_manager.hybrid_search(
             query=query,
             vector=(await self.embedding.create_embeddings([query]))[0],
             card_id=card_id,
