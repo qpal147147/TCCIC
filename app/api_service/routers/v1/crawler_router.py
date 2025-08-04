@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import json
+import asyncio
 import multiprocessing
 from pathlib import Path
 from uuid import uuid4
@@ -17,6 +18,7 @@ from app.crawler.schemas.card_list import CardItem, CardPagesItem, BankCardListP
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic.spiders.card_feature_spider import CardFeatureSpider
 from app.crawler.tccic import settings as project_settings
+from app.services.rag import RAG
 from app.configs.global_settings import global_settings
 from app.utils.logger_setup import LOG_FORMAT, LOG_DIR, LOG_FILENAME
 
@@ -72,7 +74,15 @@ def run_card_list_spider(config_path: str, bank_code: str, url: str, file_name: 
     except Exception as e:
         raise
 
-def run_card_feature_spider(config_path: str, bank_code: str, card_name: str, card_url: str, file_name: str):
+def run_card_feature_spider(
+    config_path: str, 
+    bank_code: str, 
+    card_name: str, 
+    card_url: str, 
+    file_name: str, 
+    job_id: str,
+    job_status_txt_path: str
+):
     """
     Initializes and runs the Scrapy spider in a separate process.  
     This function is intended to be the target of a multiprocessing.Process.
@@ -83,6 +93,8 @@ def run_card_feature_spider(config_path: str, bank_code: str, card_name: str, ca
         card_name: The name of the card to be crawled.
         card_url: The URL the spider should start crawling.
         file_name: The name of the file to write the results to.
+        job_id: The ID of the job.
+        job_status_txt_path: The path to the job status text file.
     """
 
     try:
@@ -94,9 +106,25 @@ def run_card_feature_spider(config_path: str, bank_code: str, card_name: str, ca
         process.start()
 
         logger.info(f"Crawling completed.")
+        logger.info(f"Start to save the card information to the vector database.")
 
         feature_jsonl_path = Path(global_settings.CRAWLER_DATA_DIR) / bank_code / "card_feature" / file_name / f"{file_name}.jsonl"
-        logging.info(f"Find the feature jsonl file at {feature_jsonl_path}.")
+        logger.info(f"Find the feature jsonl file at {feature_jsonl_path}.")
+        
+        rag = RAG(
+            vector_storage_path=global_settings.VECTOR_STORE_DIR,
+            collection_name=global_settings.VECTOR_COLLECTION_NAME
+        )
+        asyncio.run(rag.chunk_images_to_vecdb(
+            feature_jsonl_path,
+            file_name,
+            card_name,
+            bank_code,
+            batch_size=15,
+        ))
+        write_job_status(job_status_txt_path, job_id, True)
+
+        logger.info(f"Card information has been saved.")
 
         
     except Exception as e:
@@ -241,7 +269,18 @@ async def crawl_card_info(request: CardFeatureRequest):
         write_job_status(job_status_txt_path, job_id, False)
 
         # start crawling
-        p = multiprocessing.Process(target=run_card_feature_spider, args=(CONFIG_PATH, request.bank_code, request.card_name, request.card_url, card_id))
+        p = multiprocessing.Process(
+            target=run_card_feature_spider, 
+            args=(
+                CONFIG_PATH, 
+                request.bank_code, 
+                request.card_name, 
+                request.card_url, 
+                card_id, 
+                job_id, 
+                job_status_txt_path
+            )
+        )
         p.start()        
 
         response = BaseResponse[JobIDResponse](

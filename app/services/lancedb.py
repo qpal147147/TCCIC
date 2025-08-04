@@ -1,3 +1,5 @@
+from typing import Optional
+
 import jieba
 import lancedb
 import pandas as pd
@@ -51,6 +53,19 @@ class lanceDBManager:
             for index in self._table.list_indices() 
         )
 
+    def _get_filter(
+        self, 
+        card_id: Optional[str] = None,
+        bank_code: Optional[str] = None
+    ) -> Optional[str]:
+        filters = []
+
+        if card_id and card_id.strip():
+            filters.append(f"card_id = '{card_id.strip()}'")
+        if bank_code and bank_code.strip():
+            filters.append(f"bank_code = '{bank_code.strip()}'")
+        return " AND ".join(filters) if filters else None
+
     def insert(
         self, 
         items: list[VectorDatabaseData],
@@ -96,6 +111,8 @@ class lanceDBManager:
         self, 
         query: str, 
         vector:list[float], 
+        card_id: Optional[str] = None,
+        bank_code: Optional[str] = None,
         reranker: bool = False,
         top_k: int = 20, 
     ) -> pd.DataFrame:
@@ -111,15 +128,19 @@ class lanceDBManager:
             The search results are returned in order of relevance, from highest to lowest.
             The returned result includes `text`, `url`, `card_id`, `card_name`, and `bank_code`.
         """
-        
         tokenized_query = " ".join(jieba.cut_for_search(query))
-        queryBuilder = self._table.search(query_type="hybrid", vector_column_name="vector", fts_columns="tokenized_text").vector(vector).text(tokenized_query)
+        query_builder = self._table.search(query_type="hybrid", vector_column_name="vector", fts_columns="tokenized_text")
+        
+        if filter_str := self._get_filter(card_id, bank_code):
+            query_builder = query_builder.where(filter_str)
+            
+        query_builder = query_builder.vector(vector).text(tokenized_query)
 
         if reranker:
             reranker = RRFReranker(top_k*2)
-            queryBuilder = queryBuilder.rerank(reranker)
+            query_builder = query_builder.rerank(reranker)
         
-        results = queryBuilder.limit(top_k).to_pydantic(self._table_schema)
+        results = query_builder.limit(top_k).to_pydantic(self._table_schema)
 
         return pd.DataFrame(
             data=[

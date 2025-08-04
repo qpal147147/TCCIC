@@ -1,18 +1,6 @@
 import asyncio
-import os
 import json
-import uuid
-import base64
-import time
-import logging
-from pathlib import Path
-from typing import List
-from tqdm import tqdm
-from enum import Enum
-
-import jieba
-from pydantic import BaseModel
-from dotenv import load_dotenv
+from typing import Optional
 
 from app.services.llm_factory import LLMFactory
 from app.services.lancedb import lanceDBManager
@@ -140,17 +128,23 @@ class RAG():
 
         self.vector_manager.insert(items)
 
+
     async def delete_card(self, card_id: str):
         self.vector_manager.delete_rows("card_id", card_id)
+
 
     async def chat(
         self, 
         query: str,
+        card_id: Optional[str] = None,
+        bank_code: Optional[str] = None,
         top_k: int = 10
     ) -> LLMResponse:
         results = self.vector_manager.hybird_search(
             query=query,
             vector=(await self.embedding.create_embeddings([query]))[0],
+            card_id=card_id,
+            bank_code=bank_code,
             reranker=True,
             top_k=top_k
         )
@@ -172,6 +166,7 @@ class RAG():
             response=response,
             sources=sources
         )
+
 
     async def update_card(self):
         pass
