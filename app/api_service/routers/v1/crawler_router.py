@@ -140,14 +140,14 @@ def write_job_status(txt_path: str, job_id: str, status: bool):
         found = False
         for i, line in enumerate(lines):
             if line.startswith(job_id):
-                lines[i] = f"{job_id},{status}\n"
+                lines[i] = f"{job_id},{status}"
                 found = True
                 break
         
         if not found:
-            lines.append(f"{job_id},{status}\n")
+            lines.append(f"{job_id},{status}")
 
-        f.writelines(lines)
+        f.write("\n".join(lines))
 
 
 ### API endpoints ###
