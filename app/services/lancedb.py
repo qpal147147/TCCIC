@@ -114,6 +114,8 @@ class lanceDBManager:
             value: The value of the row to be deleted.
         """
         self._table.delete(f'{key} = "{value}"')
+        if self._table.count_rows() == 0:
+            self._fts_index_exist = False
 
 
     def hybrid_search(
@@ -137,7 +139,7 @@ class lanceDBManager:
             The search results are returned in order of relevance, from highest to lowest.
             The returned result includes `text`, `url`, `card_id`, `card_name`, and `bank_code`.
         """
-        if not self._check_index_exists(self._table, "tokenized_text"):
+        if not self._fts_index_exist:
             return pd.DataFrame(
                 data=[],
                 columns=["text", "url", "card_id", "card_name", "bank_code"]
