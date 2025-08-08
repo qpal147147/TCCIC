@@ -13,9 +13,26 @@ class CardFeatureRequest(BaseModel):
 class CardFeatureResponse(BaseModel):
     job_status: bool = False
 
-class CardFeatureSpiderData(BaseModel):
+class CardListSpiderData(BaseModel):
+    """Data class for CardListSpider
+    
+    Args:
+        config_path: Path to the configuration file (e.g., banks.yaml) to be used by the spider.
+        bank_code: The code of the bank to be crawled.
+        url: The URL the spider should start crawling.
+        file_name: The name of the file to write the results to.
+        job_id: The ID of the job.
     """
-    Data class for CardFeatureSpider
+    config_path: str|Path
+    bank_code: str
+    url: str
+    file_name: str
+    job_id: str
+    
+
+class CardFeatureSpiderData(BaseModel):
+    """Data class for CardFeatureSpider
+
     Args:
         config_path: Path to the configuration file (e.g., banks.yaml) to be used by the spider.
         bank_code: The code of the bank to be crawled.

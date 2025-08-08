@@ -14,7 +14,7 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
 from app.api_service.schemas.base_schema import BaseResponse, JobIDResponse
-from app.api_service.schemas.crawler_schema import CardListRequest, CardFeatureRequest, CardFeatureResponse, CardFeatureSpiderData
+from app.api_service.schemas.crawler_schema import CardListRequest, CardFeatureRequest, CardFeatureResponse, CardListSpiderData, CardFeatureSpiderData
 from app.crawler.schemas.card_list import CardItem, CardPagesItem, BankCardListPageData
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic.spiders.card_feature_spider import CardFeatureSpider
@@ -54,33 +54,42 @@ def load_scrapy_settings() -> Settings:
 SCRAPY_SETTINGS: Settings = load_scrapy_settings()
 
 ### Spider functions ###
+def crawl_card_list(config_path: str|Path, bank_code: str, url: str, file_name: str):
+    process = CrawlerProcess(SCRAPY_SETTINGS)
+    process.crawl(CardListSpider, config_path, bank_code, url, file_name)
+    process.start()
+
 def crawl_card_feature(config_path: str|Path, bank_code: str, card_name: str, card_url: str, file_name: str):
     process = CrawlerProcess(SCRAPY_SETTINGS)
     process.crawl(CardFeatureSpider, config_path, bank_code, card_name, card_url, file_name)
     process.start()
 
-def run_card_list_spider(config_path: str|Path, bank_code: str, url: str, file_name: str):
+def run_card_list_spider(spider_data: list[CardListSpiderData]):
     """
     Initializes and runs the Scrapy spider in a separate process.  
-    This function is intended to be the target of a multiprocessing.Process.
-
-    Args:
-        config_path: Path to the configuration file (e.g., banks.yaml) to be used by the spider.
-        bank_code: The code of the bank to be crawled.
-        url: The URL the spider should start crawling.
-        file_name: The name of the file to write the results to.
+    This function supports passing in a list for batch crawling.
     """
     try:
-        logger.info(f"Start crawling all card information from '{url}', bank code: '{bank_code}'.")
-        logger.info(f"The crawl result will be saved to '{file_name}'.jsonl.")
-        
-        process = CrawlerProcess(SCRAPY_SETTINGS)
-        process.crawl(CardListSpider, config_path=config_path, bank_code=bank_code, url=url, file_name=file_name)
-        process.start()
+        for data in spider_data:
+            config_path = data.config_path
+            bank_code = data.bank_code
+            url = data.url
+            file_name = data.file_name
 
-        logger.info(f"Crawling completed.")
+            logger.info(f"Start crawling all card information from '{url}', bank code: '{bank_code}'.")
+            logger.info(f"The crawl result will be saved to '{file_name}'.jsonl.")
+            
+            # crawler startup
+            p = multiprocessing.Process(
+                target=crawl_card_list,
+                args=(config_path, bank_code, url, file_name)
+            )
+            p.start()
+            p.join()
+
+            logger.info(f"Crawling completed.")
     except Exception as e:
-        raise
+        logger.error(f"An error occurred during card list crawling: {str(e)}")
 
 def run_card_feature_spider(spider_data: list[CardFeatureSpiderData]):
     """
@@ -138,7 +147,7 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData]):
             logger.info(f"Card information has been saved.")
 
     except Exception as e:
-        logger.error(f"An error occurred during multiprocessing.Process: {e}")
+        logger.error(f"An error occurred during card feature crawling: {e}")
 
 def write_job_status(txt_path: str|Path, job_id: str, status: Literal["True", "False", "Error"]):
     Path(txt_path).touch(exist_ok=True)
@@ -163,7 +172,7 @@ def write_job_status(txt_path: str|Path, job_id: str, status: Literal["True", "F
 
 ### API endpoints ###
 @router.post("/card-list")
-async def card_list(request: CardListRequest):
+async def card_list(request: CardListRequest, background_tasks: BackgroundTasks):
     """ 
     Start crawling all card information from the provided URL. 
     """
@@ -171,15 +180,71 @@ async def card_list(request: CardListRequest):
     list_id = f"list-{uuid4().hex}"
 
     try:
-        p = multiprocessing.Process(target=run_card_list_spider, args=(CONFIG_PATH, request.bank_code, request.url, list_id))
-        p.start()        
+        background_tasks.add_task(
+            run_card_list_spider,
+            spider_data=[CardListSpiderData(
+                config_path=CONFIG_PATH,
+                bank_code=request.bank_code,
+                url=request.url,
+                file_name=list_id,
+                job_id=job_id
+            )]
+        )      
 
         response = BaseResponse[JobIDResponse](
             status="success",
             message="The crawling job has been submitted successfully.",
-            data=JobIDResponse(job_id=job_id, list_id=list_id)
+            data=JobIDResponse(job_id=job_id, list_id=list_id, bank_code=request.bank_code)
         )
         return JSONResponse(content=response.model_dump(), status_code=202)
+    except Exception as e:
+        logger.error(f"Error occurred while running the spider: {e}.")
+        
+        response = BaseResponse[JobIDResponse](
+            status="fail",
+            message="Errors during crawling.",
+            error=str(e)
+        )
+        return JSONResponse(content=response.model_dump(), status_code=400)
+
+
+@router.post("/batch/card-list")
+async def batch_card_list(request: list[CardListRequest], background_tasks: BackgroundTasks):
+    """ 
+    Start crawling all card information from the provided URL. 
+    This function supports batch processing.
+    """
+    try:
+        logger.info(f"Create a batch task")
+        spider_data: list[CardListSpiderData] = []
+        for req in request:
+            job_id = str(uuid4())
+            list_id = f"list-{uuid4().hex}"
+
+            spider_data.append(CardListSpiderData(
+                config_path=CONFIG_PATH,
+                bank_code=req.bank_code,
+                url=req.url,
+                file_name=list_id,
+                job_id=job_id
+            ))
+        
+        # start crawling
+        background_tasks.add_task(
+            run_card_list_spider,
+            spider_data=spider_data
+        )      
+
+        response = BaseResponse[list[JobIDResponse]](
+            status="success",
+            message="The crawling job has been submitted successfully.",
+            data=[
+                JobIDResponse(job_id=job_id, list_id=data.file_name, bank_code=req.bank_code) 
+                for req, data in zip(request, spider_data)
+            ]
+        )
+        return JSONResponse(content=response.model_dump(), status_code=202)
+
     except Exception as e:
         logger.error(f"Error occurred while running the spider: {e}.")
         
@@ -294,7 +359,7 @@ async def card_feature(request: CardFeatureRequest, background_tasks: Background
         response = BaseResponse[JobIDResponse](
             status="success",
             message="The crawling job has been submitted successfully.",
-            data=JobIDResponse(job_id=job_id, card_name=request.card_name, card_id=card_id)
+            data=JobIDResponse(job_id=job_id, bank_code=request.bank_code, card_name=request.card_name, card_id=card_id)
         )
         return JSONResponse(content=response.model_dump(), status_code=202)
     except Exception as e:
@@ -340,7 +405,7 @@ async def batch_card_feature(request: list[CardFeatureRequest], background_tasks
             status="success",
             message="The crawling job has been submitted successfully.",
             data=[
-                JobIDResponse(job_id=data.job_id, card_name=req.card_name, card_id=data.file_name)
+                JobIDResponse(job_id=data.job_id, bank_code=req.bank_code, card_name=req.card_name, card_id=data.file_name)
                 for req, data in zip(request, spider_data)
             ]
         )

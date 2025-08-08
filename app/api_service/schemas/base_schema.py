@@ -19,5 +19,6 @@ class JobIDResponse(BaseModel):
     """
     job_id: str
     list_id: Optional[str] = None
+    bank_code: Optional[str] = None
     card_name: Optional[str] = None
     card_id: Optional[str] = None
