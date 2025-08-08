@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # mute module
     logging.getLogger("google_genai.models").setLevel(logging.CRITICAL)
 
-    multiprocessing.set_start_method("spawn")
+    # multiprocessing.set_start_method("spawn")
 
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=1108, reload=False)

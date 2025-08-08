@@ -45,10 +45,12 @@ def setup_app_logger():
         utc=LOG_UTC
     )
     file_handler.setFormatter(formatter)
+    file_handler.setLevel(LOG_LEVEL)
     logger.addHandler(file_handler)
     
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
+    console_handler.setLevel(LOG_LEVEL)
     logger.addHandler(console_handler)
 
     logger.info(f"Logger initialized. Logging to {LOG_DIR} and console. Level: {LOG_LEVEL_STR}")
