@@ -211,7 +211,7 @@ async def card_list(request: CardListRequest, background_tasks: BackgroundTasks)
 @router.post("/batch/card-list")
 async def batch_card_list(request: list[CardListRequest], background_tasks: BackgroundTasks):
     """ 
-    Start crawling all card information from the provided URL. 
+    Start crawling all card information from the provided URL.  
     This function supports batch processing.
     """
     try:
@@ -333,7 +333,7 @@ async def card_list_result(list_id: str):
 @router.post("/card-feature")
 async def card_feature(request: CardFeatureRequest, background_tasks: BackgroundTasks):
     """
-    Start crawling card feature information from the provided URL.
+    Start crawling card feature information from the provided URL.  
     And save the result to the vector database.
     """
     job_id = str(uuid4())

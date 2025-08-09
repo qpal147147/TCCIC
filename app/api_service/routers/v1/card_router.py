@@ -40,7 +40,7 @@ async def card_qa(request: Request, qa_request : QARequest):
         result = await rag.chat(
             query=qa_request.question,
             card_id=qa_request.card_id,
-            bank_code=qa_request.bank_id,
+            bank_code=qa_request.bank_code,
         )
 
         response = BaseResponse[LLMResponse](
