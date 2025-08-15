@@ -100,7 +100,7 @@ A RESTful API for web crawling, data retrieval, and conversation.
         * **bank_code** string or null  
         The bank code crawled for this task.
 
-        * **card_name** string or null
+        * **card_name** string or null  
         The card name crawled for this task.
 
         * **card_id** string or null  
@@ -212,7 +212,7 @@ A RESTful API for web crawling, data retrieval, and conversation.
     The bank name crawled for this task.
 
     * **pages** array
-        * **page_url** string
+        * **page_url** string  
         The URL of the card list.
 
         * **cards** array
@@ -269,7 +269,7 @@ A RESTful API for web crawling, data retrieval, and conversation.
     * **bank_code** string or null  
     The bank code crawled for this task.
 
-    * **card_name** string or null
+    * **card_name** string or null  
     The card name crawled for this task.
 
     * **card_id** string or null  
@@ -326,13 +326,13 @@ A RESTful API for web crawling, data retrieval, and conversation.
 
 6. #### Retrieve the processing status of the card details information.
     ```
-    POST http://localhost:1108/api/v1/crawler/card-feature/{job_id}/status
+    GET http://localhost:1108/api/v1/crawler/card-feature/{job_id}/status
     ```
 
     #### Request
     Path parameters
     ```
-    http://127.0.0.1:1108/api/v1/crawler/card-feature/38be2bcf-67ca-4882-b241-18f8b8af32bf/status
+    http://localhost:1108/api/v1/crawler/card-feature/38be2bcf-67ca-4882-b241-18f8b8af32bf/status
     ```
     * **job_id** string, Required  
     The execution job ID
@@ -364,20 +364,20 @@ A RESTful API for web crawling, data retrieval, and conversation.
     ```json
     {
         "question": "信用卡的回饋額度",
-        "bank_id": "taishin",
+        "bank_code": "taishin",
         "card_id": "card-870283de1f264befabbae33cdb1bf5c3"
     }
     ```
     * **question** string, Required  
     User’s question
 
-    * **bank_id** string or null  
+    * **bank_code** string or null  
     Bank code used to restrict bank queries.
 
     * **card_id** string or null  
     Card ID used to restrict card queries.
 
-    You may use any combination of `bank_id` and `card_id` to restrict the search range.
+    You may use any combination of `bank_code` and `card_id` to restrict the search range.
 
     #### Return
     ```json
@@ -417,6 +417,9 @@ A RESTful API for web crawling, data retrieval, and conversation.
         * **card_id** string  
         Source card ID of the data
 
+        * **bank_code** string  
+        Source bank code of the data
+
 2. #### Delete Card
     ```
     DELETE http://localhost:1108/api/v1/card/{card_id}
@@ -425,7 +428,7 @@ A RESTful API for web crawling, data retrieval, and conversation.
     #### Request
     Path parameters
     ```
-    http://127.0.0.1:1108/api/v1/card/card-c1e620f1afb049dea8bcd238e29b80c1
+    http://localhost:1108/api/v1/card/card-c1e620f1afb049dea8bcd238e29b80c1
     ```
     * **card_id**: string, Required
     The card’s unique ID
