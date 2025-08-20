@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import timedelta
 
 import jieba
 import lancedb
@@ -38,7 +39,7 @@ class lanceDBManager:
             table_name: The name of the table.
             embedding_dim: The dimension of the embedding.
         """
-        self._client = lancedb.connect(url)
+        self._client = lancedb.connect(url, read_consistency_interval=timedelta(0))
         self._table_schema = create_vector_schema(embedding_dim)
 
         try:
