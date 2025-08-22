@@ -80,7 +80,7 @@ class GlobalSettings(BaseSettings):
 
     # data store settings
     CRAWLER_DATA_DIR: str = "app/data_store/raw_json"
-    VECTOR_STORE_DIR: str = "app/data_store/lancedb"
+    VECTOR_CLIENT_URL: str = "http://localhost:19530"
     VECTOR_COLLECTION_NAME: str = "TaiwanCard"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

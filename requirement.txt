@@ -8,7 +8,8 @@ scrapy-playwright-stealth
 
 # RAG
 google-genai    # gemini
-lancedb         # vector database
+# lancedb         # vector database
+pymilvus        # vector database
 
 # general
 jieba

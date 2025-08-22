@@ -3,23 +3,24 @@ import json
 from typing import Optional
 
 from app.services.llm_factory import LLMFactory
-from app.services.lancedb import lanceDBManager
+from app.services.milvus import MilvusManager
 from app.services.schema import VectorDatabaseData, SourceData, LLMResponse
 
 
 class RAG():
     def __init__(
         self,
-        vector_storage_path: str,
+        vector_storage_url: str,
         collection_name: str,
     ):
         self.llm = LLMFactory.get_llm()
         self.embedding = LLMFactory.get_embedding()
-        self.vector_manager = lanceDBManager(
-            url=vector_storage_path, 
-            table_name=collection_name, 
+        self.vector_manager = MilvusManager(
+            url=vector_storage_url, 
+            collection_name=collection_name, 
             embedding_dim=self.embedding.embedding_dim
         )
+        self.vector_manager.create_collection()
 
     async def chunk_images_to_vecdb(
         self, 
@@ -130,7 +131,7 @@ class RAG():
 
 
     async def delete_card(self, card_id: str):
-        self.vector_manager.delete_rows("card_id", card_id)
+        self.vector_manager.delete(key="card_id", value=card_id)
 
 
     async def chat(
@@ -140,26 +141,16 @@ class RAG():
         bank_code: Optional[str] = None,
         top_k: int = 10
     ) -> LLMResponse:
-        results = self.vector_manager.hybrid_search(
+        sources = self.vector_manager.hybrid_search(
             query=query,
-            vector=(await self.embedding.create_embeddings([query]))[0],
+            query_vector=(await self.embedding.create_embeddings([query]))[0],
             card_id=card_id,
             bank_code=bank_code,
             reranker=True,
             top_k=top_k
         )
 
-        sources: list[SourceData] = []
-        references: list[str] = []
-        for row in results.itertuples(index=True):
-            sources.append(SourceData(
-                text=row.text,
-                url=row.url,
-                card_id=row.card_id,
-                bank_code=row.bank_code
-            ))
-            references.append(row.text)
-
+        references = [source.text for source in sources]
         response = await self.llm.summary_docs(query, references)
 
         return LLMResponse(
@@ -170,3 +161,7 @@ class RAG():
 
     async def update_card(self):
         pass
+
+
+    async def close(self):
+        self.vector_manager.close()
