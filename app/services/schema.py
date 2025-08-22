@@ -12,6 +12,7 @@ class SourceData(BaseModel):
     text: str
     url: str
     card_id: str
+    card_name: str
     bank_code: str
 
 class LLMResponse(BaseModel):

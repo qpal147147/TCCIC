@@ -1,6 +1,7 @@
 # custom file / directory
 logs/
 data_store/
+milvus/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

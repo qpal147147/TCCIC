@@ -132,7 +132,7 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData]):
                 continue
             
             rag = RAG(
-                vector_storage_path=global_settings.VECTOR_STORE_DIR,
+                vector_storage_url=global_settings.VECTOR_CLIENT_URL,
                 collection_name=global_settings.VECTOR_COLLECTION_NAME
             )
             asyncio.run(rag.chunk_images_to_vecdb(

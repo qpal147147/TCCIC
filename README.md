@@ -391,12 +391,14 @@ A RESTful API for web crawling, data retrieval, and conversation.
                     "text": "這是一張台新銀行信用卡的資訊頁面，主要介紹了 FlyGo...", 
                     "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/future/bf0a55e5-1f47-11f0-b432-0050568c09e3",
                     "card_id": "card-c1e620f1afb049dea8bcd238e29b80c1",
+                    "card_name": "FlyGo卡",
                     "bank_code": "taishin"
                 },
                 {
                     "text": "台新銀行FlyGo卡提供精選航旅最高5%，海外最高3%回饋...",
                     "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/future/89cd913a-8172-11ef-b432-0050568c09e3",
                     "card_id": "card-c1e620f1afb049dea8bcd238e29b80c1",
+                    "card_name": "FlyGo卡",
                     "bank_code": "taishin"
                 },
             ]
@@ -416,6 +418,9 @@ A RESTful API for web crawling, data retrieval, and conversation.
 
         * **card_id** string  
         Source card ID of the data
+
+        * **card_name** string  
+        Source card name of the data
 
         * **bank_code** string  
         Source bank code of the data
