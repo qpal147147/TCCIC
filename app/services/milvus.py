@@ -22,7 +22,7 @@ class MilvusManager:
             collection_name (str): The name of the collection.
             embedding_dim (int): The dimension of the embedding.
         """
-        self.client = MilvusClient(url=url, token="root:Milvus", db_name="default")
+        self.client = MilvusClient(uri=url, token="root:Milvus", db_name="default")
         self.collection_name = collection_name
         self.embedding_dim = embedding_dim
 

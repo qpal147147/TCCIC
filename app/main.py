@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
         collection_name=global_settings.VECTOR_COLLECTION_NAME
     )
     yield {"rag": rag}
-    rag.close()
+    await rag.close()
     logger.info(f"FastAPI is down")
 
 app = FastAPI(title="TCCIC FastAPI Application", version="1.0.0", lifespan=lifespan)
