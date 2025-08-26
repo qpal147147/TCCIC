@@ -46,9 +46,10 @@ def load_scrapy_settings() -> Settings:
         if setting_name.isupper():
             scrapy_settings.set(setting_name, getattr(project_settings, setting_name))
     
-    scrapy_settings.set('LOG_LEVEL', global_settings.LOG_LEVEL)
-    scrapy_settings.set('LOG_FILE', f"{LOG_DIR}/{LOG_FILENAME}")
-    scrapy_settings.set('LOG_FORMAT', LOG_FORMAT)
+    scrapy_settings.set('LOG_ENABLED', False)
+    # scrapy_settings.set('LOG_LEVEL', global_settings.LOG_LEVEL)
+    # scrapy_settings.set('LOG_FILE', f"{LOG_DIR}/{LOG_FILENAME}")
+    # scrapy_settings.set('LOG_FORMAT', LOG_FORMAT)
     return scrapy_settings
 
 SCRAPY_SETTINGS: Settings = load_scrapy_settings()

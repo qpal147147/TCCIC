@@ -6,7 +6,7 @@ from logging.handlers import TimedRotatingFileHandler
 from app.configs.global_settings import global_settings
 
 # default logger arguments
-LOG_FORMAT = "%(asctime)s [%(levelname)s] - [%(module)s.%(funcName)s:%(lineno)d]: %(message)s"
+LOG_FORMAT = "%(asctime)s [%(levelname)s] - [%(process)d] - [%(module)s.%(funcName)s:%(lineno)d]: %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 LOG_LEVEL_STR = getattr(global_settings, 'LOG_LEVEL', 'INFO').upper()
@@ -29,11 +29,11 @@ def setup_app_logger():
     """
 
     logger = logging.getLogger()
+    if logger.hasHandlers():
+        return 
+    
     logger.setLevel(LOG_LEVEL)
     formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
-
-    if logger.hasHandlers():
-        logger.handlers.clear()
 
     Path(LOG_DIR).mkdir(parents=True, exist_ok=True)
     file_handler = TimedRotatingFileHandler(

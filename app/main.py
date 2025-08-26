@@ -9,6 +9,8 @@ from app.utils.logger_setup import setup_app_logger
 from app.services.rag import RAG
 from app.configs.global_settings import global_settings
 
+
+setup_app_logger()
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -33,12 +35,7 @@ async def root():
 
 
 if __name__ == "__main__":
-    setup_app_logger()
-
-    # mute module
-    logging.getLogger("google_genai.models").setLevel(logging.CRITICAL)
-
     # multiprocessing.set_start_method("spawn")
 
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=1108, reload=False)
+    uvicorn.run("app.main:app", host="127.0.0.1", port=1108, reload=False, workers=2)
