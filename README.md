@@ -45,6 +45,96 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 ## To Do
 - Add more banks
 
+
+## Architecture
+
+
+## Development Environment
+**OS:** Ubuntu 22.04.3 LTS  
+**Python Version:**  3.11.13  
+**Docker Version:** 27.0.3
+
+### Installation
+1. Install the vector database(Milvus)  
+Follow the installation guide on [this page](https://milvus.io/docs/install_standalone-docker-compose.md).
+
+2. Create a conda environment and installing dependencies
+    ```bash
+    conda create -n tccic python=3.11
+    git clone https://github.com/qpal147147/TCCIC.git
+    cd TCCIC
+    pip install requirement.txt
+    playwright install
+    ```
+
+3. Modify project settings
+    * Choose your [LLM provider](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L64) and [Embedding provider](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L65)
+        ```python
+        ACTIVE_LLM_PROVIDER: Literal["openai", "gemini", "huggingface"] = "gemini"
+        ACTIVE_EMBEDDING_PROVIDER: Literal["openai", "gemini", "huggingface"] = "gemini"
+        ```
+        If your provider is not listed, refer to [this guide](https://github.com/qpal147147/TCCIC?tab=readme-ov-file#additional-notes) to customize your own option.
+    * Vector database [URL](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L83)
+        ```python
+        VECTOR_CLIENT_URL: str = "http://localhost:19530"
+        ```
+    * [API Key](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/.env)
+
+
+## Additional Notes
+1. [Log settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L72)
+
+2. [Data Storage Location Settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L82)
+
+3. Custom LLM or embedding settings
+    * Implement your class and [Inherit Initial Parameters](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L7)
+        ```python
+        class CustomLLMConfig(BaseModel):
+            """Custom LLM config"""
+            api_key: SecretStr
+            chat_model_name: str
+            temperature: float
+            max_tokens: int
+            embedding_model_name: str
+            embedding_dim: int
+            gpu: bool
+        ```
+    * Add custom options to lists and functions
+        ```python
+        # LLM settings
+        ACTIVE_LLM_PROVIDER: Literal["openai", "gemini", "huggingface", "custom"] = "custom"
+        ACTIVE_EMBEDDING_PROVIDER: Literal["openai", "gemini", "huggingface", "custom"] = "custom"
+        ```
+
+        ```python
+        def get_active_llm_config(self)
+            # ...
+            provider_map = {
+                "openai": OpenAIConfig(...),
+                "gemini": GeminiConfig(...),
+                "huggingface": HuggingFaceConfig(...),
+                "custom": CustomLLMConfig(...),
+            }
+            # ...
+        
+        def get_active_embedding_config(self)
+            # ...
+            provider_map = {
+                "openai": OpenAIConfig(...),
+                "gemini": GeminiConfig(...),
+                "huggingface": HuggingFaceConfig(...),
+                "custom": CustomLLMConfig(...),
+            }
+            # ...
+        ```
+    
+4. Customize Crawling Scope  
+    You can find all bank-related crawler configurations in [this file](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/banks.yaml).
+    Each parameter defines the scope of data extraction on the webpage.  
+    To modify the crawler behavior, adjust [Card List Spider](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/crawler/tccic/spiders/card_list_spider.py) and [Card Feature Spider](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/crawler/tccic/spiders/card_feature_spider.py) to implement your custom crawling logic.
+
+
+
 ## RESTful API
 A RESTful API for web crawling, data retrieval, and conversation.
 

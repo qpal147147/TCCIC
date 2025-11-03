@@ -48,12 +48,12 @@ class HuggingFaceConfig(BaseModelConfig):
     gpu: bool = True
 
 
-class CustomLLMConfig(BaseModel):
+class CustomLLMConfig(BaseModelConfig):
     """Custom LLM config"""
     pass
 
 
-class CustomEmbeddingConfig(BaseModel):
+class CustomEmbeddingConfig(BaseModelConfig):
     """Custom Embedding config"""
     pass
 
