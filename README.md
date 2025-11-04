@@ -45,10 +45,6 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 ## To Do
 - Add more banks
 
-
-## Architecture
-
-
 ## Development Environment
 **OS:** Ubuntu 22.04.3 LTS  
 **Python Version:**  3.11.13  
@@ -56,14 +52,14 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 
 ### Installation
 1. Install the vector database(Milvus)  
-Follow the installation guide on [this page](https://milvus.io/docs/install_standalone-docker-compose.md).
+Follow the installation guide on [this page](https://milvus.io/docs/install_standalone-docker.md).
 
 2. Create a conda environment and installing dependencies
     ```bash
     conda create -n tccic python=3.11
     git clone https://github.com/qpal147147/TCCIC.git
     cd TCCIC
-    pip install requirement.txt
+    pip install -r requirement.txt
     playwright install
     ```
 
@@ -80,14 +76,17 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
         ```
     * [API Key](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/.env)
 
-
+4. Run API Server
+    ```python
+    python -m app.main
+    ```
 ## Additional Notes
 1. [Log settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L72)
 
-2. [Data Storage Location Settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L82)
+2. [Data storage location settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L82)
 
-3. Custom LLM or embedding settings
-    * Implement your class and [Inherit Initial Parameters](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L7)
+3. Custom LLM and Embedding
+    1. Implement basic parameters in [your class](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L7).
         ```python
         class CustomLLMConfig(BaseModel):
             """Custom LLM config"""
@@ -99,7 +98,7 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
             embedding_dim: int
             gpu: bool
         ```
-    * Add custom options to lists and functions
+    2. Add custom options to lists and functions
         ```python
         # LLM settings
         ACTIVE_LLM_PROVIDER: Literal["openai", "gemini", "huggingface", "custom"] = "custom"
@@ -126,6 +125,35 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
                 "custom": CustomLLMConfig(...),
             }
             # ...
+        ```
+    
+    3. Implement methods for invoking LLM and Embedding models.You need to create your own class and implement the interface.
+        ```python
+        # Example
+        # app.services.chat
+        # app.services.embedding
+        
+        class CustomChat(ChatInterface):
+            def __init__(...)
+            async def chat(...)
+            async def summary_docs(...)
+
+        class CustomEmbedding(EmbeddingInterface):
+            def __init__(...)
+            async def create_embeddings(...)
+        ```
+    
+    4. Register your class in the factory pattern.
+        ```python
+        # app.services.llm_factory
+        class LLMFactory:
+            def get_llm():
+                if llm_provider == "custom":
+                    return CustomChat(...)
+
+            def get_embedding():
+                if llm_provider == "custom":
+                    return CustomEmbedding(...)
         ```
     
 4. Customize Crawling Scope  
