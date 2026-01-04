@@ -47,7 +47,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [ ] Improve System Stability & Security
 
 ## System Architecture
-![System Architecture](/docs/system_architecture.png)
+<img src="https://github.com/qpal147147/TCCIC/blob/main/docs/System_Architecture.png" height="700">
 
 ## Development Environment
 **OS:** Ubuntu 22.04.3 LTS  
