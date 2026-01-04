@@ -3,8 +3,8 @@ import logging
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import JSONResponse
 
-from app.api_service.schemas.card_schema import QARequest
-from app.api_service.schemas.base_schema import BaseResponse
+from app.api.schemas.card_schema import QARequest
+from app.api.schemas.base_schema import BaseResponse
 from app.services.schema import LLMResponse
 from app.services.rag import RAG
 

@@ -1,6 +1,7 @@
 import asyncio
 import json
 from typing import Optional
+from pathlib import Path
 
 from app.services.llm_factory import LLMFactory
 from app.services.milvus import MilvusManager
@@ -24,7 +25,7 @@ class RAG():
 
     async def chunk_images_to_vecdb(
         self, 
-        feature_jsonl_path: str, 
+        feature_jsonl_path: str | Path, 
         card_id: str,
         card_name: str,
         bank_code: str,

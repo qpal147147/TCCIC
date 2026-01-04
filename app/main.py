@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from app.api_service.routers.v1.api import router as v1_router
+from app.api.routers.v1.api import router as v1_router
 from app.utils.logger_setup import setup_app_logger
 from app.services.rag import RAG
 from app.configs.global_settings import global_settings

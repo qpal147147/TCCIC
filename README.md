@@ -43,7 +43,11 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 </details>
 
 ## To Do
-- Add more banks
+- [ ] Add more banks
+- [ ] Improve System Stability & Security
+
+## System Architecture
+![System Architecture](/docs/system_architecture.png)
 
 ## Development Environment
 **OS:** Ubuntu 22.04.3 LTS  

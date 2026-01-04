@@ -13,8 +13,8 @@ from fastapi.responses import JSONResponse
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
-from app.api_service.schemas.base_schema import BaseResponse, JobIDResponse
-from app.api_service.schemas.crawler_schema import CardListRequest, CardFeatureRequest, CardFeatureResponse, CardListSpiderData, CardFeatureSpiderData
+from app.api.schemas.base_schema import BaseResponse, JobIDResponse
+from app.api.schemas.crawler_schema import CardListRequest, CardFeatureRequest, CardFeatureResponse, CardListSpiderData, CardFeatureSpiderData
 from app.crawler.schemas.card_list import CardItem, CardPagesItem, BankCardListPageData
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic.spiders.card_feature_spider import CardFeatureSpider
@@ -435,7 +435,7 @@ async def card_status(job_id: str):
                     response = BaseResponse[CardFeatureResponse](
                         status="success",
                         message="Query job status successfully.",
-                        data=CardFeatureResponse(job_status=fjog_status)
+                        data=CardFeatureResponse(job_status=bool(fjog_status))
                     )
                     return JSONResponse(content=response.model_dump(), status_code=200)
         
