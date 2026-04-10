@@ -1,0 +1,233 @@
+bank_code: dbs
+bank_name: 星展銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: .//div[@data-card]
+  card:
+    title: ./div/div/div[1]//text()
+    url: ./div/div/div[1]//@href
+features:
+  - card_code: everyday/
+    cookie_button:
+    focus:
+      - content: (//div[@class="box box_02"])[2]
+        link: .//a
+      - content: //div[@id="page04"]//ul
+        link: .//a
+    sub_focus_content:
+      - //div[@class="mobilepopup-inner"]//div[@class="content"]
+    close_button: //a[@class="button-close close"]
+
+  - card_code: dbs_eco
+    cookie_button:
+    focus:
+      - content: //div[@class="slider slider03"]//ul[@class="slick-dots"]
+        link: .//button
+    sub_focus_content:
+      - //div[@class="slider slider03"]
+    close_button:
+
+  - card_code: travelworld
+    cookie_button:
+    focus:
+      - content: //div[@class="col card-item text-center"]
+        link: .//a
+      - content: //div[@class="col card-item has-rounded text-center"]
+        link: .//a
+    sub_focus_content:
+      - //div[@class="modal fade modal-detail bg-transparent show"]
+    close_button: //div[contains(@class, "show")]//div[contains(@class, "modal-content")]//a[@class="btn-close"] | //div[@id="popupContainer"]//button[text()='結束']
+
+  - card_code: travel_world_elite
+    cookie_button:
+    focus:
+      - content: //div[@class="col card-item text-center"]
+        link: .//a
+      - content: //div[@class="col card-item has-rounded text-center"]
+        link: .//a
+    sub_focus_content:
+      - //div[@class="modal fade modal-detail bg-transparent show"]
+    close_button: //div[contains(@class, "show")]//a[@class="btn-close"]
+
+  - card_code: dbs_Insignia
+    cookie_button:
+    focus:
+      - content: //div[@class="col text-item text-center"]
+        link: .//a
+      - content: //div[@class="col card-item-full text-center"]
+        link: .//a
+      - content: //div[@class="col card-item text-center"]
+        link: .//a
+    sub_focus_content:
+      - //div[@class="modal fade modal-detail bg-transparent show"]
+    close_button: //div[contains(@class, "show")]//a[@class="btn-close"]
+
+  - card_code: dbs_Vantage
+    cookie_button:
+    focus:
+      - content: //div[@class="col card-item text-center"]
+        link: .//a
+    sub_focus_content:
+      - //div[@class="modal fade modal-detail bg-transparent show"]
+    close_button: //div[contains(@class, "show")]//a[@class="btn-close"] | //div[@id="popupContainer"]//button[text()='結束']
+
+  - card_code: dbs-funlife
+    cookie_button:
+    focus:
+    sub_focus_content:
+    close_button:
+
+  - card_code: dbs-pchomeprime
+    cookie_button:
+    focus:
+      - content: //div[@class="tabs"]
+        link: .//a
+    sub_focus_content:
+    close_button:
+
+  - card_code: dbs-happygo
+    cookie_button:
+    focus:
+    sub_focus_content:
+    close_button:
+
+  - card_code: dbs-cru
+    cookie_button:
+    focus:
+    sub_focus_content:
+    close_button:
+
+  - card_code: travel_titanium
+    cookie_button:
+    focus:
+      - content: //div[@class="mode_00"]/li
+        link: .//a[text()='了解更多']
+    sub_focus_content:
+      - //div[@class="mobilepopup-inner"]
+    close_button: //a[@class="button-close close"]
+
+  - card_code: livefresh_biz_signature_ipass
+    cookie_button:
+    focus:
+      - content: //div[@class="message "]
+        link: .//a
+      - content: //section[@class="product"]
+        link: .//a
+    sub_focus_content:
+      - //div[contains(@class, "show")]//div[@class="modal-content "]
+    close_button: //div[contains(@class, "show")]//button[@class="btn__close"]
+
+  - card_code: eco-ez
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: eco-select
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: eco-plus
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: eco-world
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: everyday_2023/
+    cookie_button:
+    focus:
+      - content: //div[@class="box_s1"]
+        link: .//a
+      - content: //div[@class="page-container"]
+        link: .//a
+    sub_focus_content:
+      - //div[@class="mobilepopup-inner"]
+    close_button: //a[@class="button-close close"]
+
+  - card_code: eco-biz
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: yours_signature_business_card
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: livefresh
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: classic
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: visa-treasures-biz-signature
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: infinite
+    cookie_button:
+    focus:
+      - content: (//div[@class="fp-tableCell"])[2]
+        link: .//a[text()='了解更多 ']
+      - content: (//div[@class="fp-tableCell"])[3]
+        link: .//a[text()='了解更多 ']
+      - content: (//div[@class="fp-tableCell"])[4]
+        link: .//a[text()='了解更多 ']
+    sub_focus_content:
+      - //div[@class="modal fade modal-fixedvw show"]
+    close_button: //div[contains(@class, "show")]//a[@class="modal-close"]
+
+  - card_code: everyday_titanium
+    cookie_button:
+    focus:
+      - content: //div[@id="right-content-col"]
+        link: .//div[@class="sc-v79fs9 gZUABD"]
+    sub_focus_content:
+      - //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
+    close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]

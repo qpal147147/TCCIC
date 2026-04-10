@@ -1,0 +1,17 @@
+bank_code: hsbc
+bank_name: 滙豐銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="productModule"]
+  card:
+    title: .//*[contains(@class, "A-LNKND38L-RW-ALL")]/text()
+    url: .//a[@class="A-BTNSO-RW-ALL"]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

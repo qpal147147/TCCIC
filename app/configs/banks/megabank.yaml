@@ -1,0 +1,17 @@
+bank_code: megabank
+bank_name: 兆豐銀行
+is_dynamic: True
+xpaths:
+  tab_link:
+  division: //div[contains(@class, "item card ")]
+  card:
+    title: ./span/h2/text()
+    url: .//a[contains(@class, "outline")]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

@@ -1,0 +1,17 @@
+bank_code: sinopac
+bank_name: 永豐銀行
+is_dynamic: False
+xpaths:
+  tab_link: //h2[normalize-space(text())="卡片總覽"]/parent::li/ul[@class="lv2"]/li/a/@href
+  division: //ul[@class="Ltype1 cf"]/li
+  card:
+    title: ./h2/a/text()
+    url: ./h2/a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

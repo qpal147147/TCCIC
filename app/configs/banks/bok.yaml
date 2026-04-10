@@ -1,0 +1,17 @@
+bank_code: bok
+bank_name: 高雄銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="card-intro-box"]
+  card:
+    title: ./h3/text()
+    url: tab_url
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

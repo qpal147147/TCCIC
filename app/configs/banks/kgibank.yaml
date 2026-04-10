@@ -1,0 +1,17 @@
+bank_code: kgibank
+bank_name: 凱基銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="bg-white bg-lg-none py-16 px-12 px-lg-0 py-lg-0 d-flex fp-100p fb-lg-47p mr-0 mb-12 mr-lg-28 mb-lg-40"]
+  card:
+    title: .//div[@class="fs-h3 fs-lg-h3 color-primary-blue"]/text()
+    url: .//a//@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

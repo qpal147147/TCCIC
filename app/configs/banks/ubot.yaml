@@ -1,0 +1,17 @@
+bank_code: ubot
+bank_name: 聯邦銀行
+is_dynamic: True
+xpaths:
+  tab_link: //div[@class="accordion-body"]//a[@aria-current="page"]
+  division: //div[@class="cardDiv"]
+  card:
+    title: .//a/h2/text()
+    url: .//button[@class="btn buttonMore"]/../@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

@@ -1,0 +1,17 @@
+bank_code: sc
+bank_name: 渣打銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="sc-content-wrapper"]
+  card:
+    title: .//h2[@class="sc-product-action-cvp__heading"]/text()
+    url: .//a[contains(@class, "sc-btn--secondary")]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

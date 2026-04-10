@@ -1,0 +1,17 @@
+bank_code: feib
+bank_name: 遠東商銀
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[contains(@class, "carousel-item")]
+  card:
+    title: ./h2/text()
+    url: ./a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

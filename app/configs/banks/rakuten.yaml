@@ -1,0 +1,17 @@
+bank_code: rakuten
+bank_name: 台灣樂天
+is_dynamic: True
+xpaths:
+  tab_link: //div[@id="navCampaign"]//a
+  division: '//div[@style="display: block;"]'
+  card:
+    title: //div[@id="navCampaign"]//a[@class="active"]/text()
+    url: .//a[@class="btnApply_b"]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

@@ -1,0 +1,17 @@
+bank_code: hncb
+bank_name: 華南銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="creditcard-item h-100"]
+  card:
+    title: .//div[@class="creditcard-title"]/a/text()
+    url: .//div[@class="creditcard-title"]/a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

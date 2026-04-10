@@ -1,0 +1,17 @@
+bank_code: obank
+bank_name: 王道銀行
+is_dynamic: False
+xpaths:
+  tab_link: //ul[@class="w3-ul disc"]/li/a/@href
+  division: //div[@class="n-table-medium"]
+  card:
+    title: .//h4/text()
+    url: .//a[text()="了解更多" or text()="詳細活動內容"]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

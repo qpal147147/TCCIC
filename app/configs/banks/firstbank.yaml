@@ -1,0 +1,17 @@
+bank_code: firstbank
+bank_name: 第一銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[contains(@class, "card-item")]
+  card:
+    title: .//strong/text()
+    url: .//a[1]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

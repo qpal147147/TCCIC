@@ -1,0 +1,17 @@
+bank_code: tcb
+bank_name: 合作金庫
+is_dynamic: True
+xpaths:
+  tab_link: //div[@class="c-pager__pages"]/a
+  division: //div[@class="l-creditCard__item fjs_item"]
+  card:
+    title: .//div[@class="c-creditCard__title"]/text()
+    url: .//a[contains(@class, "o-btn--secondary")]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

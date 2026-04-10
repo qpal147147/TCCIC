@@ -1,0 +1,17 @@
+bank_code: ctbcbank
+bank_name: 中國信託
+is_dynamic: True
+xpaths:
+  tab_link: //a[contains(@class, "twrbo-c-filterOption")]
+  division: //li[@class="twrbc-creditcard-list-item"]
+  card:
+    title: .//a[@class="twrbc-creditcard-title"]/text()
+    url: .//div[@class="twrbc-creditcard-tools"]/a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

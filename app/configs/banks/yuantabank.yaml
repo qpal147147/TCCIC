@@ -1,0 +1,17 @@
+bank_code: yuantabank
+bank_name: 元大銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="card_items"]//li
+  card:
+    title: ./div[@class="card_name"]//text()
+    url: ./a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

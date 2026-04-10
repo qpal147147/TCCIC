@@ -1,0 +1,17 @@
+bank_code: esunbank
+bank_name: 玉山銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@data-cardattr]
+  card:
+    title: .//h3[@class="l-card__title"]/text()
+    url: ./a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

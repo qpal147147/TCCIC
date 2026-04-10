@@ -1,0 +1,17 @@
+bank_code: landbank
+bank_name: 土地銀行
+is_dynamic: False
+xpaths:
+  tab_link: //ul[@class="contect_menu_item"][2]/li/a/@href
+  division: //div[@class="col-md-6"]
+  card:
+    title: .//span/text()
+    url: .//a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

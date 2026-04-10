@@ -1,0 +1,17 @@
+bank_code: sunnybank
+bank_name: 陽信銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //ul[@id="smenu-125"]/li
+  card:
+    title: ./a/@title
+    url: ./a/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

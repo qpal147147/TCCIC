@@ -1,0 +1,18 @@
+bank_code: cathaybk
+bank_name: 國泰世華
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="cubre-m-compareCard -credit"]
+  card:
+    title: .//div[@class='cubre-m-compareCard__title']/text()
+    url: .//div[@class="cubre-m-compareCard__link"]//@href
+features:
+  - card_code: cube
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+      - //ol[@class="w-full"]//li[@class="group is-active"]//div[contains(@class, "box-border")]
+    close_button: //div[@id='modal-popup'][contains(@class, 'modal-popup-active')]//div[contains(@class, "cursor-pointer")] | //li[@class="group is-active"]

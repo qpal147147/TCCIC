@@ -1,0 +1,17 @@
+bank_code: bot
+bank_name: 臺灣銀行
+is_dynamic: True
+xpaths:
+  tab_link: //div[@class="LeftMenu"]//li/a
+  division: //div[@class="Column Tab_1"]
+  card:
+    title: .//div[@class="KV_PiC"]/h2/text()
+    url: tab_url
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

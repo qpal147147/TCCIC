@@ -1,0 +1,17 @@
+bank_code: bankchb
+bank_name: 彰化銀行
+is_dynamic: False
+xpaths:
+  tab_link: //div[@class="sidemenu-block"]//a/@href
+  division: //div[@class="content-Ri"]
+  card:
+    title: //ul[@class="breadcrumb"]/li[@class="active"]/text()
+    url: tab_url
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

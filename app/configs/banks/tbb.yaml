@@ -1,0 +1,17 @@
+bank_code: tbb
+bank_name: 台灣企銀
+is_dynamic: True
+xpaths:
+  tab_link: //a[contains(@class, "c-pager__num")]
+  division: //div[@class="c-creditcard"]
+  card:
+    title: .//div[@class="c-creditcard__title"]/text()
+    url: .//span[text()="了解更多"]/../@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

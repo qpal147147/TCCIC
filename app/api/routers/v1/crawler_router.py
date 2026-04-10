@@ -26,7 +26,7 @@ from app.utils.logger_setup import LOG_FORMAT, LOG_DIR, LOG_FILENAME
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs" / "banks.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "banks"
 SCRAPY_PROJECT_PATH = PROJECT_ROOT / "crawler"
 sys.path.append(str(SCRAPY_PROJECT_PATH))
 

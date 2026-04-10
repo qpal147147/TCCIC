@@ -1,0 +1,17 @@
+bank_code: skbank
+bank_name: 新光銀行
+is_dynamic: True
+xpaths:
+  tab_link: //li[contains(@class, "pagination__item")]/a
+  division: //div[contains(@class, "credit-card ng-tns-c183-3")]
+  card:
+    title: .//div[contains(@class, "credit-card__subtitle")]/text()
+    url: .//div[contains(@class, "button-secondary button-normal")]/../@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

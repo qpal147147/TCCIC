@@ -1,0 +1,17 @@
+bank_code: americanexpress
+bank_name: 美國運通
+is_dynamic: True
+xpaths:
+  tab_link: //button[contains(@class, "sc_mo_carousel-card-tabs_item")]
+  division: //div[contains(@class, "sc_at_box_root")]//div[@data-qe-id="HorizontalCardTile"]
+  card:
+    title: .//div[contains(@class, "sc_fontType_helvetica_bold")]/text()
+    url: .//a[contains(@class, "sc_horizontallyFluid")]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

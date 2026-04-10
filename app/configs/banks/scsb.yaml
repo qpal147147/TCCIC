@@ -1,0 +1,17 @@
+bank_code: scsb
+bank_name: 上海銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //div[@class="row ctcard-list"]
+  card:
+    title: .//h3/text()
+    url: .//a[contains(@title, "了解更多")]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:

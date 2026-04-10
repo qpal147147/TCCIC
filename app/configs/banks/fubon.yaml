@@ -1,0 +1,17 @@
+bank_code: fubon
+bank_name: 台北富邦銀行
+is_dynamic: False
+xpaths:
+  tab_link:
+  division: //li[@class="credit-card"]
+  card:
+    title: ./div[@class="title"]/text()
+    url: ./a[span[normalize-space(text())="了解更多"]]/@href
+features:
+  - card_code: test
+    cookie_button:
+    focus:
+      - content:
+        link:
+    sub_focus_content:
+    close_button:
