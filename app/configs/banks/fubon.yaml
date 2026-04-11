@@ -3,10 +3,10 @@ bank_name: 台北富邦銀行
 is_dynamic: False
 xpaths:
   tab_link:
-  division: //li[@class="credit-card"]
+  division: //div[@class="card-list-box"]
   card:
-    title: ./div[@class="title"]/text()
-    url: ./a[span[normalize-space(text())="了解更多"]]/@href
+    title: .//p[@class="card-title"]/text()
+    url: .//a[@class="more-btn"]/@href
 features:
   - card_code: test
     cookie_button:

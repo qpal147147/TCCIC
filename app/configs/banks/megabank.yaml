@@ -2,11 +2,11 @@ bank_code: megabank
 bank_name: 兆豐銀行
 is_dynamic: True
 xpaths:
-  tab_link:
-  division: //div[contains(@class, "item card ")]
+  tab_link: button.o-pagination__num
+  division: //div[contains(@class, "c-creditCard") and not(contains(@class, "__"))]
   card:
-    title: ./span/h2/text()
-    url: .//a[contains(@class, "outline")]/@href
+    title: .//div[contains(@class, "c-creditCard__title")]/text()
+    url: .//a[@class="o-link"]/@href
 features:
   - card_code: test
     cookie_button:

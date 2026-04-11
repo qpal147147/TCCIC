@@ -1,12 +1,12 @@
 bank_code: cathaybk
 bank_name: 國泰世華
-is_dynamic: False
+is_dynamic: true
 xpaths:
   tab_link:
-  division: //div[@class="cubre-m-compareCard -credit"]
+  division: //div[@data-ga-card="true"]
   card:
-    title: .//div[@class='cubre-m-compareCard__title']/text()
-    url: .//div[@class="cubre-m-compareCard__link"]//@href
+    title: .//h3/text()
+    url: .//a[contains(@title, "信用卡介紹-詳細說明")]//@href
 features:
   - card_code: cube
     cookie_button:

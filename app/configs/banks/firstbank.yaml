@@ -1,6 +1,6 @@
 bank_code: firstbank
 bank_name: 第一銀行
-is_dynamic: False
+is_dynamic: True
 xpaths:
   tab_link:
   division: //div[contains(@class, "card-item")]
