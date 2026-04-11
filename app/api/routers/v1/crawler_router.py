@@ -303,6 +303,13 @@ async def card_list_result(list_id: str):
             )
         )
         return JSONResponse(content=response.model_dump(), status_code=200)
+    except StopIteration:
+        response = BaseResponse(
+            status="fail",
+            message="The crawl has not yet completed or the file does not exist.",
+            error=f"No JSONL file found for list_id='{list_id}'."
+        )
+        return JSONResponse(content=response.model_dump(), status_code=400)
     except FileNotFoundError as e:
         logger.error(f"File not found: {card_list_file_path}")
 
