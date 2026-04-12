@@ -86,7 +86,7 @@ def extract_cards(result_data: dict) -> list[dict]:
 
     for page in result_data["data"]["pages"]:
         for card in page["cards"]:
-            clean_title = re.sub(r"\(.*?\)", "", card["title"]).strip()
+            clean_title = card["title"].strip()
             cards.append({
                 "bank_name": bank_name,
                 "bank_code": bank_code,
@@ -154,8 +154,8 @@ def test_bank_has_cards(bank_code: str, bank_url: str):
     cards = extract_cards(result_data)
 
     print(f"[{bank_code}] Found {len(cards)} card(s):")
-    # for card in cards:
-    #     print(f"  - {card['title']:30s}  {card['url']}")
+    for card in cards:
+        print(f"  - {card['title']:30s}  {card['url']}")
 
     assert len(cards) > 0, (
         f"No cards found for '{bank_code}'. "

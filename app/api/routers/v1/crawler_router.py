@@ -37,15 +37,12 @@ router = APIRouter()
 ### Scrapy settings ###
 def load_scrapy_settings() -> Settings:
     """
-    Loads Scrapy project settings from the project_settings module.
-    It iterates through all uppercase attributes of project_settings
-    and sets them on a new Scrapy Settings object.
+    Loads Scrapy project settings from the project_settings module using
+    Scrapy's native setmodule(), which correctly handles all setting types
+    (including dict-type settings like DEFAULT_REQUEST_HEADERS).
     """
     scrapy_settings = Settings()
-    for setting_name in dir(project_settings):
-        if setting_name.isupper():
-            scrapy_settings.set(setting_name, getattr(project_settings, setting_name))
-    
+    scrapy_settings.setmodule(project_settings, priority='project')
     scrapy_settings.set('LOG_ENABLED', False)
     # scrapy_settings.set('LOG_LEVEL', global_settings.LOG_LEVEL)
     # scrapy_settings.set('LOG_FILE', f"{LOG_DIR}/{LOG_FILENAME}")

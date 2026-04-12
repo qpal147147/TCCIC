@@ -48,12 +48,11 @@ class CardListSpider(scrapy.Spider):
     # Scrapy callbacks
     # ------------------------------------------------------------------
 
-    def start_requests(self):
+    async def start(self):
         """
-        Override Scrapy's default start_requests so that dynamic-mode banks
-        launch a Playwright browser directly for the first request, bypassing
-        the plain HTTP hop that would otherwise be rejected with 403/4xx by
-        bot-detection systems before parse() is ever called.
+        Dynamic-mode banks launch Playwright directly, 
+        bypassing the plain HTTP hop that would otherwise be rejected
+        with 403/4xx by bot-detection systems before parse() is ever called.
         """
         for url in self.start_urls:
             if self.strategy.config.is_dynamic:
@@ -77,9 +76,10 @@ class CardListSpider(scrapy.Spider):
     def parse(self, response: HtmlResponse):
         """
         Entry point for static-mode banks only.
-        Follows tab links derived from the bank's XPath configuration.
+        Emits direct CardItems for single-card tabs, then follows remaining tab links.
         """
         self.logger.info("Static mode — following tab links.")
+        yield from self.strategy.get_direct_tab_cards(response)
         yield from self.strategy.get_tab_requests(
             response,
             callback=self.parse_static_page,
@@ -90,7 +90,8 @@ class CardListSpider(scrapy.Spider):
         """
         Playwright callback for JS-rendered listing pages.
 
-        Delegates tab navigation to the strategy's async generator, then
+        Emits direct CardItems for single-card tabs (from config, no navigation),
+        then delegates tab navigation to the strategy's async generator and
         parses each yielded mock response for card items.
         """
         page: Page = response.meta.get("playwright_page")
@@ -99,6 +100,9 @@ class CardListSpider(scrapy.Spider):
             return
 
         try:
+            for item in self.strategy.get_direct_tab_cards(response):
+                yield item
+                
             async for mock_response in self.strategy.navigate_dynamic_page(page, response):
                 for item in self.strategy.parse_cards(mock_response):
                     yield item

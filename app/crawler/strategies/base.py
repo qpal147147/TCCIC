@@ -37,6 +37,26 @@ class BankStrategy:
     # Static page helpers
     # ------------------------------------------------------------------
 
+    def get_direct_tab_cards(self, response: HtmlResponse) -> Generator[CardItem, None, None]:
+        """
+        Yield CardItems for tabs listed in skip_card_tabs.
+
+        Some banks have tab links that lead to a single card's intro page rather
+        than a card list. The tab text and card URL are taken directly from config
+        (no HTTP request is made to the tab destination).
+        """
+        for entry in self.config.xpaths.skip_card_tabs:
+            for text, url in entry.items():
+                card_url = response.urljoin(url)
+                self.logger.info(f"Single-card tab '{text}' — emitting direct CardItem → {card_url}")
+                yield CardItem(
+                    bank_name=self.config.bank_name,
+                    bank_code=self.config.bank_code,
+                    page_url=response.url,
+                    card_title=text,
+                    card_url=card_url,
+                )
+
     def get_tab_requests(
         self,
         response: HtmlResponse,
@@ -45,6 +65,8 @@ class BankStrategy:
     ) -> Generator[Request, None, None]:
         """
         Yield one Scrapy Request per tab link found via the configured XPath.
+        Tabs listed in skip_card_tabs are skipped — they are handled by
+        get_direct_tab_cards instead.
         If no tab_link XPath is configured, yield a single request for the
         current URL so the listing page itself is parsed as a tab.
         """
@@ -66,8 +88,19 @@ class BankStrategy:
             )
             return
 
+        # Resolve skip_card_tab URLs so we can skip them when following tab links.
+        skip_card_urls = {
+            response.urljoin(url)
+            for entry in self.config.xpaths.skip_card_tabs
+            for url in entry.values()
+        }
+
         self.logger.info(f"Found {len(tab_links)} tab(s) on {response.url}")
         for link in tab_links:
+            resolved = response.urljoin(link)
+            if resolved in skip_card_urls:
+                self.logger.info(f"Skipping single-card tab URL: {resolved}")
+                continue
             yield response.follow(
                 url=link,
                 callback=callback,
@@ -168,6 +201,12 @@ class BankStrategy:
             tab_elements = await page.query_selector_all(self.config.xpaths.tab_link)
             self.logger.info(f"Found {len(tab_elements)} tab(s) in page.")
 
+        skip_tab_texts = {
+            text
+            for entry in self.config.xpaths.skip_card_tabs
+            for text in entry.keys()
+        }
+
         for i in range(len(tab_elements)):
             # Re-query every iteration to avoid stale element references after
             # DOM mutations triggered by the previous tab click.
@@ -178,6 +217,11 @@ class BankStrategy:
 
             tab = current_tabs[i]
             tab_text = (await tab.text_content() or "").strip()
+
+            if tab_text in skip_tab_texts:
+                self.logger.info(f"Skipping single-card tab [{i}]: '{tab_text}'")
+                continue
+
             self.logger.info(f"Clicking tab [{i}]: '{tab_text}'")
 
             await tab.click(timeout=20000, force=True)
