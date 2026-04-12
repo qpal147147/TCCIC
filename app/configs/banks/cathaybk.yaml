@@ -13,6 +13,6 @@ features:
     focus:
       - content:
         link:
-    sub_focus_content:
-      - //ol[@class="w-full"]//li[@class="group is-active"]//div[contains(@class, "box-border")]
-    close_button: //div[@id='modal-popup'][contains(@class, 'modal-popup-active')]//div[contains(@class, "cursor-pointer")] | //li[@class="group is-active"]
+        popup:
+          content: //ol[@class="w-full"]//li[@class="group is-active"]//div[contains(@class, "box-border")]
+          close_button: //div[@id='modal-popup'][contains(@class, 'modal-popup-active')]//div[contains(@class, "cursor-pointer")] | //li[@class="group is-active"]

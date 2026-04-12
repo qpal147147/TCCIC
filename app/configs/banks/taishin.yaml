@@ -7,6 +7,8 @@ xpaths:
   #                 For example, if the page contains tabbed categories, this parameter is used to capture the link for each tab and automatically navigate to the corresponding URL.
   #                 If the webpage is static, it should capture the link; otherwise, it should capture the entire content block.
   #                 If the webpage does not have a tab section, set this value to null or leave it empty.
+  # skip_card_tabs (list[dict[str, str]]): List of tab names and their corresponding URLs to skip.
+  #                                        Each dictionary contains two keys: "name" and "url".
   # division (str): Used to locate the area on the page where each card is situated.
   # card (str): Used to extract the title and url of each card. If the url is the same as the tab_link, set its value to the string "tab_url".
   tab_link: //ul[@class="nav nav-tabs  tab-sty-1"]/li/a/@href
@@ -14,17 +16,30 @@ xpaths:
   card:
     title: .//p[@itemprop="name"]/text()
     url: .//a[@itemprop="url"]/@href
+
+# Bank-level default cookie button selector applied to all cards.
+# Override per-card by setting cookie_button inside a features entry.
+cookie_button: //button[contains(@class, 'cookie')]
+
 features:
-  # Each field in this list defines information extraction rules for a specific page.
-  # - card_code (str): Used to match specific keywords in the URL and determine which set of rules to apply based on the matched keyword.
-  # - cookie_button (str): Some pages may display a button such as "Authorize Cookies" when loaded. This field specifies the selector to capture and click that button.
-  # - focus (list):
-  #   - content (str): Defines the specific area(s) of the page you want to capture for further parsing.
-  #   - link (str): Based on the `content` parameter. After capturing a specific area, this allows you to automatically retrieve and click all links within that area.
-  # - sub_focus_content (list): Based on the `focus_content` and `link_button` parameters. After clicking a link within the target area, a popup window may appear. This parameter defines the rules for capturing content within the popup. If there is no popup or it is not needed, set this value to null.
-  # - close_button (str): Also based on the `sub_focus_content` parameter. If the popup contains a close button, this parameter defines the rules for capturing and clicking that button. If there is no popup or it is not needed, set this value to null.
-  - card_code: cg046
-    cookie_button: //button[contains(@class, 'cookie')]
+  # Each entry defines crawl rules for one card URL pattern.
+  #
+  # - card_code (str): Matched as a substring of the card URL to select which rule set applies.
+  # - cookie_button (str|null): Per-card override for the cookie-consent button selector.
+  #                             Leave null to inherit the bank-level cookie_button above.
+  # - focus (list): Ordered list of page regions to interact with.
+  #   - content (str): XPath of the region to screenshot and parse links from.
+  #   - link (str): XPath of clickable links within that region.
+  #   - popup (object|null): Set only if clicking a link in this region opens an in-page popup
+  #                          (i.e. the URL does not change and no new browser tab opens).
+  #                          Omit this field entirely when no popup is expected.
+  #     Example:
+  #       popup:
+  #         content: //div[@class="modal-body"]   # XPath of the popup area to screenshot
+  #         close_button: //button[@class="close"] # Selector to close the popup afterwards
+  #
+  - card_code: cg047
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -32,31 +47,25 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg021
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg018
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg040
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -64,11 +73,9 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg045
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -76,11 +83,9 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg042
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -88,31 +93,25 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg007
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg009
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg023
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -120,11 +119,9 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg038
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -132,31 +129,25 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg019
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg008
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg010
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -164,11 +155,9 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg012
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -176,11 +165,9 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg013
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -188,19 +175,21 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg035
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
-    sub_focus_content:
-    close_button:
+
+  - card_code: cg046
+    cookie_button:
+    focus:
+      - content: //div[@id="ts-comp-41-collapse-5"]//ul
+        link: .//a
 
   - card_code: cg001
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//li
@@ -208,11 +197,9 @@ features:
         link: .//li
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//li
-    sub_focus_content:
-    close_button:
 
   - card_code: cg004
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -220,101 +207,81 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg005
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg014
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg006
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg002
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg039
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg011
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg043
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg003
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-2"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg034
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg041
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -322,11 +289,9 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg029
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -334,11 +299,9 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg030
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
@@ -346,31 +309,34 @@ features:
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg015
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
       - content: //div[@id="ts-comp-41-collapse-3"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg028
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
-    sub_focus_content:
-    close_button:
 
   - card_code: cg024
-    cookie_button: //button[contains(@class, 'cookie')]
+    cookie_button:
     focus:
       - content: //div[@class="ts-comp-40-1 no-border-bottom"]
         link: .//a
-    sub_focus_content:
-    close_button:
+
+
+  - card_code: cg025
+    cookie_button:
+    focus:
+      - content: //div[@class="ts-comp-40-1 no-border-bottom"]
+        link: .//a
+      - content: //div[@class="ts-comp-7-4 ts-comp-7-4-2"]
+        link: .//a
+      - content: //div[@id="ts-comp-41-collapse-5"]//ul
+        link: .//a

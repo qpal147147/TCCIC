@@ -16,27 +16,39 @@ class CardItemXPath(BaseModel):
 
 class PageXPaths(BaseModel):
     """XPath selectors used by the card-list spider to discover cards on a listing page."""
-    tab_link: Optional[str]   # Locates tab links that categorize cards; null if no tabs
-    division: Optional[str]   # Locates the container element for each individual card
+    tab_link: Optional[str] = None         # Locates tab links that categorize cards; null if no tabs
+    skip_card_tabs: list[dict[str, str]] = []  # {tab_text: card_url} — tabs whose destination is a
+                                           # single-card intro page rather than a list. A CardItem
+                                           # is emitted directly from config; the page is not crawled.
+    division: Optional[str] = None         # Locates the container element for each individual card
     card: CardItemXPath
 
 
-class ContentXpath(BaseModel):
+class PopupConfig(BaseModel):
+    """Selectors for capturing and dismissing a popup triggered by clicking a focus-area link."""
+    content: Optional[str] = None       # XPath of the popup region to screenshot
+    close_button: Optional[str] = None  # Selector to close the popup after screenshotting
+
+
+class FocusItem(BaseModel):
     """A single focus area and its clickable link selector for the card-feature spider."""
-    content: Optional[str]    # XPath of the region to screenshot / interact with
-    link: Optional[str]       # XPath of links inside that region to click through
+    content: Optional[str] = None        # XPath of the region to screenshot / interact with
+    link: Optional[str] = None           # XPath of links inside that region to click through
+    popup: Optional[PopupConfig] = None  # Set only if clicking links in this area opens a popup
 
 
-class FeatureXpaths(BaseModel):
+class FeatureConfig(BaseModel):
     """
     Interaction rules for one card-feature URL pattern.
     card_code is matched as a substring of the card URL to select the correct rule set.
     """
     card_code: str
-    cookie_button: Optional[str]          # Selector for the cookie-consent button, if any
-    focus: Optional[list[ContentXpath]]   # Ordered list of regions to interact with
-    sub_focus_content: Optional[list[str]]  # XPath(s) of popup content to screenshot
-    close_button: Optional[str]           # Selector to close a popup after screenshotting
+    cookie_button: Optional[str] = None  # Per-card override; falls back to bank-level if None
+    focus: Optional[list[FocusItem]] = None
+
+    def effective_cookie_button(self, bank_config: 'BankConfig') -> Optional[str]:
+        """Return per-card cookie_button if set, otherwise fall back to the bank-level default."""
+        return self.cookie_button or bank_config.cookie_button
 
 
 class BankConfig(BaseModel):
@@ -45,11 +57,12 @@ class BankConfig(BaseModel):
     bank_name: str
     is_dynamic: bool
     xpaths: PageXPaths
-    features: list[FeatureXpaths]
-    crawl_policy: CrawlPolicy = CrawlPolicy()  # Falls back to defaults if not set in YAML
+    cookie_button: Optional[str] = None   # Bank-level default; overridable per-card in FeatureConfig
+    features: list[FeatureConfig] = []
+    crawl_policy: CrawlPolicy = CrawlPolicy()
 
-    def get_feature_config(self, card_url: str) -> Optional[FeatureXpaths]:
-        """Return the first FeatureXpaths whose card_code appears in card_url, or None."""
+    def get_feature_config(self, card_url: str) -> Optional[FeatureConfig]:
+        """Return the first FeatureConfig whose card_code appears in card_url, or None."""
         for feature in self.features:
             if feature.card_code in card_url:
                 return feature
