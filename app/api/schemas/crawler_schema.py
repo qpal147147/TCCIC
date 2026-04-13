@@ -1,4 +1,5 @@
 import re
+from typing import Literal
 from pydantic import BaseModel, field_validator
 from pathlib import Path
 
@@ -30,9 +31,16 @@ class CardFeatureRequest(BaseModel):
     def validate_bank_code(cls, v: str) -> str:
         return _validate_bank_code(v)
 
+    @field_validator('card_url')
+    @classmethod
+    def validate_card_url(cls, v: str) -> str:
+        if not v.startswith(('http://', 'https://')):
+            raise ValueError("card_url must be an HTTP or HTTPS URL")
+        return v
+
 
 class CardFeatureResponse(BaseModel):
-    job_status: bool = False
+    job_status: Literal["pending", "completed", "error"] = "pending"
 
 
 class CardListSpiderData(BaseModel):

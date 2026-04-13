@@ -121,12 +121,12 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData]):
             feature_jsonl_path = Path(global_settings.CRAWLER_DATA_DIR) / bank_code / "card_feature" / file_name / f"{file_name}.jsonl"
             if not feature_jsonl_path.exists():
                 logger.error(f"The feature jsonl file does not exist at {feature_jsonl_path}.")
-                write_job_status(job_status_txt_path, job_id, "Error")
+                write_job_status(job_status_txt_path, job_id, "error")
                 continue
 
             if os.stat(feature_jsonl_path).st_size == 0:
                 logger.info(f"The feature jsonl file is empty, skipping.")
-                write_job_status(job_status_txt_path, job_id, "Error")
+                write_job_status(job_status_txt_path, job_id, "error")
                 continue
             
             rag = RAG(
@@ -139,14 +139,14 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData]):
                 card_name,
                 bank_code,
             ))
-            write_job_status(job_status_txt_path, job_id, "True")
+            write_job_status(job_status_txt_path, job_id, "completed")
 
             logger.info(f"Card information has been saved.")
 
     except Exception as e:
         logger.error(f"An error occurred during card feature crawling: {e}")
 
-def write_job_status(txt_path: str|Path, job_id: str, status: Literal["True", "False", "Error"]):
+def write_job_status(txt_path: str|Path, job_id: str, status: Literal["pending", "completed", "error"]):
     Path(txt_path).touch(exist_ok=True)
     lines = []
     with open(txt_path, "r", encoding="utf-8") as f:
@@ -236,7 +236,7 @@ async def batch_card_list(request: list[CardListRequest], background_tasks: Back
             status="success",
             message="The crawling job has been submitted successfully.",
             data=[
-                JobIDResponse(job_id=job_id, list_id=data.file_name, bank_code=req.bank_code) 
+                JobIDResponse(job_id=data.job_id, list_id=data.file_name, bank_code=req.bank_code)
                 for req, data in zip(request, spider_data)
             ]
         )
@@ -344,7 +344,7 @@ async def card_feature(request: CardFeatureRequest, background_tasks: Background
     card_id = f"card-{uuid4().hex}"
 
     try:
-        write_job_status(JOB_STATUS_TXT_PATH, job_id, "False")
+        write_job_status(JOB_STATUS_TXT_PATH, job_id, "pending")
 
         # start crawling
         background_tasks.add_task(
@@ -391,7 +391,7 @@ async def batch_card_feature(request: list[CardFeatureRequest], background_tasks
             job_id = str(uuid4())
             card_id = f"card-{uuid4().hex}"
 
-            write_job_status(JOB_STATUS_TXT_PATH, job_id, "False")
+            write_job_status(JOB_STATUS_TXT_PATH, job_id, "pending")
             spider_data.append(CardFeatureSpiderData(
                 config_path=CONFIG_PATH, 
                 bank_code=req.bank_code, 
@@ -438,7 +438,7 @@ async def card_status(job_id: str):
                     response = BaseResponse[CardFeatureResponse](
                         status="success",
                         message="Query job status successfully.",
-                        data=CardFeatureResponse(job_status=bool(fjog_status))
+                        data=CardFeatureResponse(job_status=fjog_status)
                     )
                     return JSONResponse(content=response.model_dump(), status_code=200)
         
