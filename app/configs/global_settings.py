@@ -13,6 +13,8 @@ class BaseModelConfig(BaseModel):
     embedding_model_name: str
     embedding_dim: int
     gpu: bool
+    rate_limit_sleep_s: float = 0.0  # Seconds to wait between LLM batch calls; set per-provider based on RPM quota
+    llm_batch_size: int = 10         # Number of concurrent LLM requests per batch; set per-provider based on RPM quota
 
 
 class OpenAIConfig(BaseModelConfig):
@@ -24,17 +26,21 @@ class OpenAIConfig(BaseModelConfig):
     embedding_model_name: str = "text-embedding-3-large"
     embedding_dim: int = 3072
     gpu: bool = False
+    rate_limit_sleep_s: float = 2.0  # Tier-1: ~500 RPM
+    llm_batch_size: int = 30
 
 
 class GeminiConfig(BaseModelConfig):
     """Gemini model config"""
     api_key: SecretStr
-    chat_model_name: str = "gemini-2.0-flash"
+    chat_model_name: str = "gemma-4-31b-it"
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "gemini-embedding-001"
     embedding_dim: int = 1536
     gpu: bool = False
+    rate_limit_sleep_s: float = 60.0  # Free tier: 30 RPM
+    llm_batch_size: int = 10          # Free tier: 15 req/batch × sleep 60s ≈ 15 RPM
 
 
 class HuggingFaceConfig(BaseModelConfig):
@@ -46,6 +52,8 @@ class HuggingFaceConfig(BaseModelConfig):
     embedding_model_name: str = "intfloat/multilingual-e5-large"
     embedding_dim: int = 1024
     gpu: bool = True
+    rate_limit_sleep_s: float = 0.0  # Local inference, no rate limit
+    llm_batch_size: int = 10          # Memory-bound; adjust based on VRAM
 
 
 class CustomLLMConfig(BaseModelConfig):

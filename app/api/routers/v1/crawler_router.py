@@ -138,7 +138,6 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData]):
                 file_name,
                 card_name,
                 bank_code,
-                batch_size=15
             ))
             write_job_status(job_status_txt_path, job_id, "True")
 

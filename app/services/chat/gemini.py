@@ -55,25 +55,14 @@ class GeminiChat(ChatInterface):
         else:
             return response.text
         
-    async def summary_docs(self, query: str, docs: list[str]) -> str:
-        prompt="""
-        你是資訊問答助手，你將盡可能詳盡地使用以下資訊回答問題。  
-        僅根據提供的來源資料提供答案，不要擅自假設。
-        最後回傳的答案不要包含任何類似"以下是摘要"或"以下是結論"等內容作為開頭。
-        答案盡可能的簡短精要，切勿延伸話題。
-
-        問題: {question}
-        """
-
-        references = []
-        for i, doc in enumerate(docs, start=1):
-            references.append(f"資料{i}:\n{doc}")
-
+    async def summary_docs(self, query: str, docs: list[str], system_prompt: str | None = None) -> str:
+        guarded_query = f"{system_prompt}\n\n問題：{query}" if system_prompt else query
+        references = [f"資料{i}:\n{doc}" for i, doc in enumerate(docs, start=1)]
 
         response = await self.client.aio.models.generate_content(
             model=self.model_config.chat_model_name,
             contents=[
-                prompt.format(question=query),
+                guarded_query,
                 *references
             ],
             config=types.GenerateContentConfig(

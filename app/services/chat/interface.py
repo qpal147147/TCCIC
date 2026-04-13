@@ -34,10 +34,11 @@ class ChatInterface(ABC):
         pass
 
     @abstractmethod
-    async def summary_docs(self, query: str, docs: List[str]) -> str:
+    async def summary_docs(self, query: str, docs: List[str], system_prompt: str | None = None) -> str:
         """
         Generate a summary based on the given prompt and documents.
-        - query: User input.
+        - query: The user query string.
         - docs: References used to summarize information.
+        - system_prompt: Optional system-level instruction
         """
         pass
