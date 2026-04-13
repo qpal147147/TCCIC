@@ -4,7 +4,7 @@ from typing import Optional
 import jieba
 from pymilvus import MilvusClient, DataType, Function, FunctionType, AnnSearchRequest, RRFRanker
 
-from app.services.schema import VectorDatabaseData, SourceData
+from app.services.schema import VectorDatabaseData, SourceData, CardInfo
 
 jieba.setLogLevel(20)
 logger = logging.getLogger(__name__)
@@ -215,5 +215,40 @@ class MilvusManager:
         
         return sources
     
+    def list_cards(self, bank_code: Optional[str] = None) -> list[CardInfo]:
+        """Return one CardInfo per unique card_id stored in the collection.
+        Args:
+            bank_code: Optional filter; returns only cards from the specified bank.
+        """
+        filter_expr = (
+            f"bank_code == '{bank_code.strip()}'" if bank_code
+            else "card_id != ''"
+        )
+        results = self.client.query(
+            collection_name=self.collection_name,
+            filter=filter_expr,
+            output_fields=["card_id", "card_name", "bank_code"],
+            limit=16384,
+        )
+        seen: set[str] = set()
+        cards: list[CardInfo] = []
+        for r in results:
+            if r["card_id"] not in seen:
+                seen.add(r["card_id"])
+                cards.append(CardInfo(
+                    card_id=r["card_id"],
+                    card_name=r["card_name"],
+                    bank_code=r["bank_code"],
+                ))
+        return cards
+
+    def ping(self) -> bool:
+        """Return True if the Milvus server is reachable and the collection exists."""
+        try:
+            self.client.has_collection(self.collection_name)
+            return True
+        except Exception:
+            return False
+
     def close(self):
         self.client.close()

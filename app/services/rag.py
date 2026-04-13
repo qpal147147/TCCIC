@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 from app.services.llm_factory import LLMFactory
 from app.services.milvus import MilvusManager
-from app.services.schema import VectorDatabaseData, SourceData, LLMResponse
+from app.services.schema import VectorDatabaseData, SourceData, LLMResponse, CardInfo
 from app.configs.global_settings import global_settings
 
 _QA_SYSTEM_PROMPT = """
@@ -184,6 +184,9 @@ class RAG():
 
         return len(all_results), total_failed
 
+
+    async def list_cards(self, bank_code: Optional[str] = None) -> list[CardInfo]:
+        return self.vector_manager.list_cards(bank_code=bank_code)
 
     async def delete_card(self, card_id: str):
         self.vector_manager.delete(key="card_id", value=card_id)

@@ -1,16 +1,42 @@
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.schemas.card_schema import QARequest
 from app.api.schemas.base_schema import BaseResponse
-from app.services.schema import LLMResponse
+from app.services.schema import LLMResponse, CardInfo
 from app.services.rag import RAG
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("")
+async def list_cards(request: Request, bank_code: Optional[str]):
+    """List all vectorized cards stored in Milvus, optionally filtered by bank_code."""
+    rag: RAG = request.state.rag
+
+    try:
+        cards = await rag.list_cards(bank_code=bank_code)
+
+        response = BaseResponse[list[CardInfo]](
+            status="success",
+            message=f"Found {len(cards)} card(s).",
+            data=cards
+        )
+        return JSONResponse(content=response.model_dump(), status_code=200)
+    except Exception as e:
+        logger.error(f"An error occurred while listing cards: {e}")
+
+        response = BaseResponse(
+            status="fail",
+            message="Error occurred while listing cards.",
+            error=str(e)
+        )
+        return JSONResponse(content=response.model_dump(), status_code=500)
 
 
 @router.delete("/{card_id}")

@@ -18,3 +18,8 @@ class SourceData(BaseModel):
 class LLMResponse(BaseModel):
     response: str
     sources: list[SourceData]
+
+class CardInfo(BaseModel):
+    card_id: str
+    card_name: str
+    bank_code: str
