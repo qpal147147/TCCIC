@@ -40,11 +40,21 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Customize llm package
 - [x] Remove the llama-index framework
 - [x] Add batch crawler API
+
+### v4.0.0
+- [x] API Key authentication
+- [x] Async job queue worker pool to prevent CPU exhaustion under high request volume
+- [x] Batch request size limit & queue full protection
+- [x] File locking for concurrent job status writes
+- [x] Add `GET /health` endpoint
+- [x] Add `GET /card/` list cards endpoint
+- [x] Job status changed from boolean to enum (`pending` / `completed` / `error`)
+- [x] Prompt injection defense for Q&A
+- [x] LLM batch size and rate limit sleep configurable per provider
 </details>
 
 ## To Do
 - [ ] Add more banks
-- [ ] Improve System Stability & Security
 
 ## System Architecture
 <img src="https://github.com/qpal147147/TCCIC/blob/main/docs/System_Architecture.png" height="700">
@@ -85,11 +95,13 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
     python -m app.main
     ```
 ## Additional Notes
-1. [Log settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L72)
+1. [Log settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L81)
 
-2. [Data storage location settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L82)
+2. [Data storage location settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L90)
 
-3. Custom LLM and Embedding
+3. [Crawler concurrency settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L95)
+
+4. Custom LLM and Embedding
     1. Implement basic parameters in [your class](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L7).
         ```python
         class CustomLLMConfig(BaseModel):
@@ -101,6 +113,8 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
             embedding_model_name: str
             embedding_dim: int
             gpu: bool
+            rate_limit_sleep_s: float
+            llm_batch_size: int
         ```
     2. Add custom options to lists and functions
         ```python
@@ -169,6 +183,29 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
 
 ## RESTful API
 A RESTful API for web crawling, data retrieval, and conversation.
+
+> **Authentication:** All endpoints except `GET /health` require a valid `X-API-Key` header.
+> ```
+> X-API-Key: your-api-key
+> ```
+
+### Health
+
+1. #### Check service status
+    ```
+    GET http://localhost:1108/api/v1/health
+    ```
+
+    #### Return
+    ```json
+    {
+        "status": "success",
+        "message": "Service is healthy.",
+        "data": null,
+        "error": null
+    }
+    ```
+    Returns `200` if healthy, `503` if Milvus is unreachable.
 
 ### Crawler
 
@@ -465,18 +502,52 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "status": "success",
         "message": "Query job status successfully.",
         "data": {
-            "job_status": true
+            "job_status": "completed"
         },
         "error": null
     }
     ```
-    * **job_status** boolean  
-    The status of the execution job.
+    * **job_status** string  
+    The status of the execution job: `pending` (in progress), `completed` (success), `error` (failed).
 
 
 ### Card
 
-1. #### Chat
+1. #### List all vectorized cards
+    ```
+    GET http://localhost:1108/api/v1/card/
+    ```
+
+    #### Request
+    Query parameters (optional)
+    ```
+    http://localhost:1108/api/v1/card/?bank_code=taishin
+    ```
+    * **bank_code** string, Optional  
+    Filter results by bank code. Omit to return all cards.
+
+    #### Return
+    ```json
+    {
+        "status": "success",
+        "message": "Found 2 card(s).",
+        "data": [
+            {
+                "card_id": "card-870283de1f264befabbae33cdb1bf5c3",
+                "card_name": "FlyGo卡",
+                "bank_code": "taishin"
+            },
+            {
+                "card_id": "card-c1e620f1afb049dea8bcd238e29b80c1",
+                "card_name": "太陽卡/玫瑰卡",
+                "bank_code": "taishin"
+            }
+        ],
+        "error": null
+    }
+    ```
+
+2. #### Chat
     ```
     POST http://localhost:1108/api/v1/card/qa
     ```
@@ -547,7 +618,7 @@ A RESTful API for web crawling, data retrieval, and conversation.
         * **bank_code** string  
         Source bank code of the data
 
-2. #### Delete Card
+3. #### Delete Card
     ```
     DELETE http://localhost:1108/api/v1/card/{card_id}
     ```
@@ -557,7 +628,7 @@ A RESTful API for web crawling, data retrieval, and conversation.
     ```
     http://localhost:1108/api/v1/card/card-c1e620f1afb049dea8bcd238e29b80c1
     ```
-    * **card_id**: string, Required
+    * **card_id**: string, Required  
     The card’s unique ID
 
     #### Return
