@@ -73,6 +73,7 @@ class GlobalSettings(BaseSettings):
     ACTIVE_EMBEDDING_PROVIDER: Literal["openai", "gemini", "huggingface"] = "gemini"
 
     # API keys
+    AUTH_KEY: SecretStr  # API header for authentication
     OPENAI_API_KEY: SecretStr
     GEMINI_API_KEY: SecretStr
     HF_API_KEY: SecretStr
@@ -90,6 +91,11 @@ class GlobalSettings(BaseSettings):
     CRAWLER_DATA_DIR: str = "app/data_store/raw_json"
     VECTOR_CLIENT_URL: str = "http://localhost:19530"
     VECTOR_COLLECTION_NAME: str = "TaiwanCard"
+
+    # Crawler concurrency settings
+    CRAWL_MAX_CONCURRENT_JOBS: int = 3    # Max simultaneous Playwright subprocesses per worker process
+    CRAWL_QUEUE_MAX_SIZE: int = 50        # Max jobs waiting in queue; returns 503 when full
+    CRAWL_BATCH_MAX_SIZE: int = 50        # Max items allowed per batch request
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
