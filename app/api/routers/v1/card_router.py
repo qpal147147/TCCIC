@@ -15,9 +15,10 @@ router = APIRouter()
 
 
 @router.get("")
-async def list_cards(request: Request, bank_code: Optional[str]):
+async def list_cards(request: Request, bank_code: Optional[str] = None):
     """List all vectorized cards stored in Milvus, optionally filtered by bank_code."""
     rag: RAG = request.state.rag
+    bank_code = bank_code or None
 
     try:
         cards = await rag.list_cards(bank_code=bank_code)

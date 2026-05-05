@@ -78,4 +78,4 @@ if __name__ == "__main__":
     # multiprocessing.set_start_method("spawn")
 
     import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=1108, reload=False, workers=2)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=1108, reload=False, workers=1)
