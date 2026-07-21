@@ -51,6 +51,10 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Job status changed from boolean to enum (`pending` / `completed` / `error`)
 - [x] Prompt injection defense for Q&A
 - [x] LLM batch size and rate limit sleep configurable per provider
+
+### v5.0.0
+- [ ] Improve the structure design of Xpath 
+
 </details>
 
 ## To Do
