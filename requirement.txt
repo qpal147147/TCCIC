@@ -19,3 +19,7 @@ pydantic-settings
 pyyaml
 fastapi[standard]
 pytest
+
+# demo
+streamlit
+requests
