@@ -5,7 +5,6 @@ logs/
 data_store/
 milvus/
 scripts/
-docs/
 CLAUDE.md
 
 # Byte-compiled / optimized / DLL files

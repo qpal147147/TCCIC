@@ -53,7 +53,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] LLM batch size and rate limit sleep configurable per provider
 
 ### v5.0.0
-- [ ] Improve the structure design of Xpath 
+- [x] Add SQLite to save metadata
 
 </details>
 

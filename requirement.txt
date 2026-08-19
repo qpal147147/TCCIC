@@ -11,6 +11,10 @@ google-genai    # gemini
 # lancedb         # vector database
 pymilvus        # vector database
 
+# relational store
+sqlalchemy>=2.0   # ORM for the metadata store (jobs, cards, chunks, summary cache)
+alembic           # schema migrations
+
 # general
 jieba
 pandas

@@ -89,6 +89,7 @@ class GlobalSettings(BaseSettings):
 
     # data store settings
     CRAWLER_DATA_DIR: str = "app/data_store/raw_json"
+    METADATA_DB_PATH: str = "app/data_store/tccic.db"
     VECTOR_CLIENT_URL: str = "http://localhost:19530"
     VECTOR_COLLECTION_NAME: str = "TaiwanCard"
 
