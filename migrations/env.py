@@ -16,9 +16,15 @@ from app.configs.global_settings import global_settings
 from app.services.store.models import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", f"sqlite:///{global_settings.METADATA_DB_PATH}")
 
-if config.config_file_name is not None:
+# A programmatic caller (the app's startup upgrade) sets the URL itself; the CLI
+# leaves it blank in alembic.ini and falls back to the configured store path.
+if not config.get_main_option("sqlalchemy.url", None):
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{global_settings.METADATA_DB_PATH}")
+
+# Only reconfigure logging when Alembic is driving. Running this in-process would
+# replace the handlers that setup_app_logger() installed for the whole service.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata

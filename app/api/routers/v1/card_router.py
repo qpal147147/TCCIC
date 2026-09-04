@@ -8,6 +8,7 @@ from app.api.schemas.card_schema import QARequest
 from app.api.schemas.base_schema import BaseResponse
 from app.services.schema import LLMResponse, CardInfo
 from app.services.rag import RAG
+from app.services.store import Store
 
 
 logger = logging.getLogger(__name__)
@@ -40,12 +41,20 @@ async def list_cards(request: Request, bank_code: Optional[str] = None):
         return JSONResponse(content=response.model_dump(), status_code=500)
 
 
-@router.delete("/{card_id}")
-async def delete_card(request: Request, card_id: str):
-    rag: RAG = request.state.rag
+@router.delete("/{card_key}")
+async def delete_card(request: Request, card_key: str):
+    """
+    Drop a card's vectors.
 
+    The catalog row survives: the card still exists, it simply has no index any more.
+    """
+    rag: RAG = request.state.rag
+    store: Store = request.state.store
     try:
-        await rag.delete_card(card_id=card_id)
+        # Milvus still names the field card_id; the value it holds is the card_key.
+        await rag.delete_card(card_id=card_key)
+        store.chunks.delete_for_card(card_key)
+        store.cards.clear_crawl_state(card_key)
 
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
@@ -66,7 +75,7 @@ async def card_qa(request: Request, qa_request : QARequest):
     try:
         result = await rag.chat(
             query=qa_request.question,
-            card_id=qa_request.card_id,
+            card_id=qa_request.card_key,
             bank_code=qa_request.bank_code,
         )
 

@@ -39,10 +39,6 @@ class CardFeatureRequest(BaseModel):
         return v
 
 
-class CardFeatureResponse(BaseModel):
-    job_status: Literal["pending", "completed", "error"] = "pending"
-
-
 class CardListSpiderData(BaseModel):
     """Data class for CardListSpider
 
@@ -50,13 +46,12 @@ class CardListSpiderData(BaseModel):
         config_path: Path to the configuration file (e.g., banks.yaml) to be used by the spider.
         bank_code: The code of the bank to be crawled.
         url: The URL the spider should start crawling.
-        file_name: The name of the file to write the results to.
-        job_id: The ID of the job.
+        job_id: The ID of the job; also names the output file, since a card list
+            is a snapshot of one execution and needs no separate identity.
     """
     config_path: str | Path
     bank_code: str
     url: str
-    file_name: str
     job_id: str
 
 
@@ -68,14 +63,13 @@ class CardFeatureSpiderData(BaseModel):
         bank_code: The code of the bank to be crawled.
         card_name: The name of the card to be crawled.
         card_url: The URL the spider should start crawling.
-        file_name: The name of the file to write the results to.
+        card_key: Stable identity of the card; names the artifact directory and
+            scopes the card's vectors, so a re-crawl replaces the previous one.
         job_id: The ID of the job.
-        job_status_txt_path: The path to the job status text file.
     """
     config_path: str | Path
     bank_code: str
     card_name: str
     card_url: str
-    file_name: str
+    card_key: str
     job_id: str
-    job_status_txt_path: str | Path

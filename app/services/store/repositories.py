@@ -133,6 +133,25 @@ class CardRepository(_BaseRepository):
             session.commit()
             return card
 
+    def clear_crawl_state(self, card_key: str) -> Optional[Card]:
+        """
+        Forget that a card was ever crawled, returning it to the state a freshly
+        registered card is in: known, but holding no vectors.
+
+        Used when a card's vectors are deleted. `status` is deliberately left
+        alone — that field says whether the bank still offers the card, which an
+        operator deleting an index has not changed. The next successful crawl
+        sets these timestamps again, so nothing has to be reset by hand.
+        """
+        with self._session_factory() as session:
+            card = session.get(Card, card_key)
+            if card is None:
+                return None
+            card.last_crawled_at = None
+            card.last_changed_at = None
+            session.commit()
+            return card
+
     def set_status(self, card_key: str, status: str) -> Optional[Card]:
         """Mark a card active or delisted. Delisted cards are kept, never deleted."""
         _require(status, _CARD_STATUSES)

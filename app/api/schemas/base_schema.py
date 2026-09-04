@@ -15,10 +15,13 @@ class BaseResponse(BaseModel, Generic[DataT]):
 
 class JobIDResponse(BaseModel):
     """
-    Job ID response schema
+    Acknowledgement returned when a crawl job is accepted.
+
+    `job_id` identifies this execution and is the only handle needed to poll
+    status or fetch results. `card_key` identifies the card itself and stays the
+    same across re-crawls, so callers can store it permanently.
     """
     job_id: str
-    list_id: Optional[str] = None
     bank_code: Optional[str] = None
     card_name: Optional[str] = None
-    card_id: Optional[str] = None
+    card_key: Optional[str] = None

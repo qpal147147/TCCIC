@@ -8,7 +8,7 @@ Using: pytest tests/test_store.py
 
 import pytest
 
-from app.services.store import Card, ChunkInput, Store
+from app.services.store import Card, ChunkInput, Store, upgrade_schema
 
 BANK = "taishin"
 CARD_URL = "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg047/card001/"
@@ -96,6 +96,28 @@ def test_mark_crawled_separates_looked_from_changed(store, card_key):
 
     store.cards.mark_crawled(card_key, content_changed=True)
     assert store.cards.get(card_key).last_changed_at is not None
+
+
+def test_clear_crawl_state_returns_a_card_to_unindexed(store, card_key):
+    """
+    Deleting a card's vectors puts it back where a freshly registered card
+    starts: still in the catalog, still on sale, simply not indexed.
+    """
+    store.cards.mark_crawled(card_key, content_changed=True)
+
+    cleared = store.cards.clear_crawl_state(card_key)
+
+    assert cleared.last_crawled_at is None
+    assert cleared.last_changed_at is None
+    assert cleared.status == "active"  # deleting an index says nothing about the bank
+
+
+def test_crawl_state_recovers_without_manual_reset(store, card_key):
+    """The next successful crawl restores the timestamps on its own."""
+    store.cards.clear_crawl_state(card_key)
+    store.cards.mark_crawled(card_key)
+
+    assert store.cards.get(card_key).last_crawled_at is not None
 
 
 def test_invalid_card_status_is_rejected(store, card_key):
@@ -286,3 +308,41 @@ def test_vector_store_can_be_rebuilt_from_sqlite_alone(store, card_key):
     ]
 
     assert rebuilt == summaries
+
+
+# --- startup schema upgrade --------------------------------------------------
+
+def test_startup_upgrade_creates_a_missing_database(tmp_path):
+    """
+    A fresh checkout or a deleted database file must come back on boot.
+
+    Without this the service starts happily and only fails once a request hits a
+    table that was never created.
+    """
+    db = tmp_path / "nested" / "tccic.db"
+    upgrade_schema(str(db))
+
+    store = Store(str(db))
+    try:
+        card = store.cards.upsert(BANK, CARD_NAME, CARD_URL)
+        assert store.cards.get(card.card_key) is not None
+    finally:
+        store.close()
+
+
+def test_startup_upgrade_preserves_existing_data(tmp_path):
+    """Running the upgrade every boot must be a no-op, not a reset."""
+    db = tmp_path / "tccic.db"
+
+    upgrade_schema(str(db))
+    store = Store(str(db))
+    store.cards.upsert(BANK, CARD_NAME, CARD_URL)
+    store.close()
+
+    upgrade_schema(str(db))  # second boot
+
+    store = Store(str(db))
+    try:
+        assert len(store.cards.list()) == 1
+    finally:
+        store.close()

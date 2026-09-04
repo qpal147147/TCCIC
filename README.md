@@ -54,6 +54,8 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 
 ### v5.0.0
 - [x] Add SQLite to save metadata
+- [x] Record the crawler status to the SQLite database.
+- [x] Add `jobs` API has been added to replace the previous query endpoint. The query now uses the `job_id`, and the easily confused `card_id` and `list_id` have been removed.
 
 </details>
 

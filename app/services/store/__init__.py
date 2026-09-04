@@ -11,7 +11,7 @@ Usage:
     job = store.jobs.create(job_id, "card_feature", bank_code, card_url)
 """
 
-from app.services.store.database import Store, create_db_engine
+from app.services.store.database import Store, create_db_engine, upgrade_schema
 from app.services.store.models import (
     Base,
     CallbackStatus,
@@ -35,6 +35,7 @@ from app.services.store.repositories import (
 __all__ = [
     "Store",
     "create_db_engine",
+    "upgrade_schema",
     "Base",
     "Card",
     "CrawlJob",

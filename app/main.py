@@ -8,6 +8,7 @@ from app.api.routers.v1.api import router as v1_router
 from app.api.routers.v1.crawler_router import run_card_feature_spider, run_card_list_spider
 from app.utils.logger_setup import setup_app_logger
 from app.services.rag import RAG
+from app.services.store import Store, upgrade_schema
 from app.configs.global_settings import global_settings
 
 
@@ -22,6 +23,14 @@ async def lifespan(app: FastAPI):
         vector_storage_url=global_settings.VECTOR_CLIENT_URL,
         collection_name=global_settings.VECTOR_COLLECTION_NAME
     )
+    # Apply any pending migrations before anything reads the store, so a fresh
+    # checkout or a deleted database file starts working without a manual step.
+    # Failing here is deliberate: a service with no schema cannot serve requests.
+    upgrade_schema(global_settings.METADATA_DB_PATH)
+
+    # One store shared by the request handlers and the worker threads; its
+    # repositories open a session per call, so this is safe to hand around.
+    store = Store(global_settings.METADATA_DB_PATH)
 
     feature_queue: asyncio.Queue = asyncio.Queue(maxsize=global_settings.CRAWL_QUEUE_MAX_SIZE)
     list_queue: asyncio.Queue = asyncio.Queue(maxsize=global_settings.CRAWL_QUEUE_MAX_SIZE)
@@ -30,7 +39,7 @@ async def lifespan(app: FastAPI):
         while True:
             spider_data = await feature_queue.get()
             try:
-                await asyncio.to_thread(run_card_feature_spider, spider_data)
+                await asyncio.to_thread(run_card_feature_spider, spider_data, store)
             except Exception as e:
                 logger.error(f"Feature worker error: {e}")
             finally:
@@ -40,7 +49,7 @@ async def lifespan(app: FastAPI):
         while True:
             spider_data = await list_queue.get()
             try:
-                await asyncio.to_thread(run_card_list_spider, spider_data)
+                await asyncio.to_thread(run_card_list_spider, spider_data, store)
             except Exception as e:
                 logger.error(f"List worker error: {e}")
             finally:
@@ -53,6 +62,7 @@ async def lifespan(app: FastAPI):
 
     yield {
         "rag": rag,
+        "store": store,
         "feature_queue": feature_queue,
         "list_queue": list_queue,
     }
@@ -62,6 +72,7 @@ async def lifespan(app: FastAPI):
         w.cancel()
     await asyncio.gather(*workers, return_exceptions=True)
     await rag.close()
+    store.close()
     logger.info("FastAPI is down")
 
 

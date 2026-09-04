@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routers.v1.crawler_router import router as crawler_router
 from app.api.routers.v1.card_router import router as card_router
+from app.api.routers.v1.job_router import router as job_router
 from app.api.schemas.base_schema import BaseResponse
 from app.api.dependencies import verify_api_key
 from app.services.rag import RAG
@@ -10,6 +11,7 @@ from app.services.rag import RAG
 router = APIRouter()
 
 router.include_router(crawler_router, prefix="/crawler", tags=["crawler"], dependencies=[Depends(verify_api_key)])
+router.include_router(job_router, prefix="/jobs", tags=["jobs"], dependencies=[Depends(verify_api_key)])
 router.include_router(card_router, prefix="/card", tags=["card"], dependencies=[Depends(verify_api_key)])
 
 

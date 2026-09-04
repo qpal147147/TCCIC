@@ -10,6 +10,8 @@ long inside an async endpoint is not measurable next to an LLM call.
 import logging
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -23,6 +25,33 @@ from app.services.store.repositories import (
 )
 
 logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
+
+
+def upgrade_schema(db_path: str) -> None:
+    """
+    Bring the database at `db_path` up to the latest migration.
+
+    Run at startup so a fresh checkout, a deleted database file, or a pull that
+    adds a migration all just work. Without it a missing schema stays invisible
+    until the first request hits a table that isn't there — a late and confusing
+    failure. Alembic no-ops when the database is already current, so this is
+    cheap to run every boot.
+
+    Migrations remain the single source of schema history; this only automates
+    *applying* them, it does not create tables from the models.
+    """
+    config = Config(str(ALEMBIC_INI))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+    # env.py would otherwise re-read alembic.ini's logging section and replace
+    # the handlers the service already installed.
+    config.attributes["configure_logger"] = False
+
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    command.upgrade(config, "head")
+    logger.info(f"Metadata store schema is up to date at '{db_path}'.")
 
 def _apply_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
     """
@@ -99,8 +128,8 @@ class Store:
         """
         Create tables straight from the models.
 
-        For tests and first-run bootstrap only — Alembic owns the schema in
-        normal operation so migrations stay the single history of changes.
+        For tests only — the service applies migrations via `upgrade_schema()`,
+        so Alembic stays the single history of schema changes.
         """
         Base.metadata.create_all(self.engine)
 
