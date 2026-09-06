@@ -270,6 +270,30 @@ class JobRepository(_BaseRepository):
         with self._session_factory() as session:
             return session.scalars(stmt).first()
 
+    def fail_orphaned_jobs(self, reason: str) -> int:
+        """
+        Finalize jobs that were still queued or running when the service stopped.
+
+        Both the queue and the workers live inside this process, so at startup
+        nothing can legitimately be in flight — any such row is a leftover from a
+        crash or restart. Without this they would sit unfinished forever, and
+        because the idempotency check treats an active job as "already being
+        crawled", a single leftover would lock its card out of every future
+        submission.
+
+        Returns the number of jobs reconciled.
+        """
+        now = utcnow()
+        stmt = select(CrawlJob).where(CrawlJob.status.in_(ACTIVE_JOB_STATUSES))
+        with self._session_factory() as session:
+            orphans = list(session.scalars(stmt))
+            for job in orphans:
+                job.status = "error"
+                job.error = reason
+                job.finished_at = now
+            session.commit()
+            return len(orphans)
+
     def last_completed_for_card(self, card_key: str) -> Optional[CrawlJob]:
         """
         The most recent successful job for a card — the baseline that breakage

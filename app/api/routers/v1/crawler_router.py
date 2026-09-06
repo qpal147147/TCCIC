@@ -341,6 +341,22 @@ async def card_feature(request: Request, body: CardFeatureRequest):
 
     try:
         card = store.cards.upsert(body.bank_code, body.card_name, body.card_url)
+        active = store.jobs.find_active_by_card_key(card.card_key)
+
+        if active is not None:
+            logger.info(f"Card '{body.card_name}' is already {active.status}; returning job {active.job_id}.")
+            response = BaseResponse[JobIDResponse](
+                status="success",
+                message=f"This card is already being crawled (job is '{active.status}').",
+                data=JobIDResponse(
+                    job_id=active.job_id,
+                    bank_code=body.bank_code,
+                    card_name=body.card_name,
+                    card_key=card.card_key
+                )
+            )
+            return JSONResponse(content=response.model_dump(), status_code=200)
+
         store.jobs.create(job_id, "card_feature", body.bank_code, body.card_url, card_key=card.card_key)
 
         spider_data = [CardFeatureSpiderData(
@@ -401,9 +417,24 @@ async def batch_card_feature(request: Request, body: list[CardFeatureRequest]):
     spider_data: list[CardFeatureSpiderData] = []
 
     try:
+        acknowledged: list[JobIDResponse] = []
+        duplicates = 0
+
         for req in body:
-            job_id = str(uuid4())
             card = store.cards.upsert(req.bank_code, req.card_name, req.card_url)
+            
+            active = store.jobs.find_active_by_card_key(card.card_key)
+            if active is not None:
+                duplicates += 1
+                acknowledged.append(JobIDResponse(
+                    job_id=active.job_id,
+                    bank_code=req.bank_code,
+                    card_name=req.card_name,
+                    card_key=card.card_key
+                ))
+                continue
+
+            job_id = str(uuid4())
             store.jobs.create(
                 job_id, "card_feature", req.bank_code, req.card_url,
                 card_key=card.card_key, batch_id=batch_id
@@ -416,24 +447,30 @@ async def batch_card_feature(request: Request, body: list[CardFeatureRequest]):
                 card_key=card.card_key,
                 job_id=job_id
             ))
+            acknowledged.append(JobIDResponse(
+                job_id=job_id,
+                bank_code=req.bank_code,
+                card_name=req.card_name,
+                card_key=card.card_key
+            ))
 
-        queue.put_nowait(spider_data)
+        if spider_data:
+            queue.put_nowait(spider_data)
+
+        message = f"{len(spider_data)} crawling job(s) submitted."
+        if duplicates:
+            message += f" {duplicates} card(s) are already being crawled."
 
         response = BaseResponse[list[JobIDResponse]](
             status="success",
-            message="The crawling job has been submitted successfully.",
-            data=[
-                JobIDResponse(
-                    job_id=data.job_id,
-                    bank_code=req.bank_code,
-                    card_name=req.card_name,
-                    card_key=data.card_key
-                )
-                for req, data in zip(body, spider_data)
-            ]
+            message=message,
+            data=acknowledged
         )
-        return JSONResponse(content=response.model_dump(), status_code=202)
+        # Nothing was accepted for processing when every item was a duplicate.
+        return JSONResponse(content=response.model_dump(), status_code=202 if spider_data else 200)
     except asyncio.QueueFull:
+        # Only the jobs created here — the deduplicated ones belong to crawls
+        # that are still live and must not be marked failed.
         for data in spider_data:
             store.jobs.mark_failed(data.job_id, "Job queue is full.")
         response = BaseResponse(

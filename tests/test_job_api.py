@@ -105,13 +105,18 @@ def test_card_feature_submission_registers_the_card(client, store):
     assert store.jobs.get(data["job_id"]).card_key == data["card_key"]
 
 
-def test_resubmitting_a_card_keeps_one_catalog_entry(client, store):
-    """Re-crawling must not create a second card; card_key is derived, not random."""
+def test_recrawling_reuses_the_catalog_entry(client, store):
+    """
+    A second crawl of the same card is a new job against the same card: card_key
+    is derived from the URL, not generated, so the catalog never grows a twin.
+    """
     first = submit_card_feature(client)
+    store.jobs.mark_completed(first["job_id"])
+
     second = submit_card_feature(client)
 
-    assert first["card_key"] == second["card_key"]
-    assert first["job_id"] != second["job_id"]
+    assert second["job_id"] != first["job_id"]
+    assert second["card_key"] == first["card_key"]
     assert len(store.cards.list()) == 1
 
 
@@ -266,6 +271,106 @@ def test_missing_artifact_is_reported_as_gone(client, store, tmp_path):
     store.jobs.mark_completed(job_id, artifact_dir=str(tmp_path / "vanished.jsonl"))
 
     assert client.get(f"/api/v1/jobs/{job_id}/result").status_code == 410
+
+
+# --- idempotency -------------------------------------------------------------
+
+def test_resubmitting_an_active_card_returns_the_same_job(client, store):
+    """
+    Two crawls of one card would each delete and re-insert its vectors, so the
+    second request must join the first rather than start a rival crawl.
+    """
+    first = submit_card_feature(client)
+
+    r = client.post(
+        "/api/v1/crawler/card-feature",
+        json={"bank_code": BANK, "card_name": CARD_NAME, "card_url": CARD_URL},
+    )
+
+    assert r.status_code == 200  # nothing new was accepted
+    assert r.json()["data"]["job_id"] == first["job_id"]
+
+    with store.session_factory() as session:
+        assert len(session.scalars(select(CrawlJob)).all()) == 1
+
+
+def test_a_running_card_also_blocks_resubmission(client, store):
+    first = submit_card_feature(client)
+    store.jobs.mark_running(first["job_id"])
+
+    r = client.post(
+        "/api/v1/crawler/card-feature",
+        json={"bank_code": BANK, "card_name": CARD_NAME, "card_url": CARD_URL},
+    )
+
+    assert r.status_code == 200
+    assert r.json()["data"]["job_id"] == first["job_id"]
+
+
+def test_a_failed_card_can_be_retried(client, store):
+    """Idempotency must not become a permanent lock — retrying is the point."""
+    first = submit_card_feature(client)
+    store.jobs.mark_failed(first["job_id"], "timeout")
+
+    assert submit_card_feature(client)["job_id"] != first["job_id"]
+
+
+def test_batch_skips_cards_already_in_flight(client, store):
+    """A duplicate inside a batch must not hold up the rest of it."""
+    first = submit_card_feature(client)
+    other_url = "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg046/card001/"
+
+    r = client.post(
+        "/api/v1/crawler/batch/card-feature",
+        json=[
+            {"bank_code": BANK, "card_name": CARD_NAME, "card_url": CARD_URL},
+            {"bank_code": BANK, "card_name": "太陽卡", "card_url": other_url},
+        ],
+    )
+
+    assert r.status_code == 202  # something was still accepted
+    data = r.json()["data"]
+    assert data[0]["job_id"] == first["job_id"]   # deduplicated
+    assert data[1]["job_id"] != first["job_id"]   # newly queued
+    assert "1 card(s) are already being crawled" in r.json()["message"]
+
+
+def test_batch_deduplicates_within_itself(client, store):
+    """The same card listed twice in one batch is crawled once."""
+    r = client.post(
+        "/api/v1/crawler/batch/card-feature",
+        json=[{"bank_code": BANK, "card_name": CARD_NAME, "card_url": CARD_URL}] * 3,
+    )
+
+    assert r.status_code == 202
+    job_ids = {item["job_id"] for item in r.json()["data"]}
+    assert len(job_ids) == 1
+
+    with store.session_factory() as session:
+        assert len(session.scalars(select(CrawlJob)).all()) == 1
+
+
+def test_batch_of_only_duplicates_queues_nothing(client, store):
+    first = submit_card_feature(client)
+
+    r = client.post(
+        "/api/v1/crawler/batch/card-feature",
+        json=[{"bank_code": BANK, "card_name": CARD_NAME, "card_url": CARD_URL}],
+    )
+
+    assert r.status_code == 200  # nothing accepted for processing
+    assert r.json()["data"][0]["job_id"] == first["job_id"]
+
+
+def test_card_list_is_not_deduplicated(client, store):
+    """
+    Repeat card-list crawls are merely wasteful, not harmful: each writes its own
+    snapshot. Only card-feature contends over shared vectors.
+    """
+    first = submit_card_list(client)
+    second = submit_card_list(client)
+
+    assert first != second
 
 
 # --- card deletion -----------------------------------------------------------

@@ -185,6 +185,35 @@ def test_last_completed_job_is_the_breakage_baseline(store, card_key):
     assert baseline.stats_json["images"] == 14
 
 
+def test_orphaned_jobs_are_reconciled_at_startup(store, card_key):
+    """
+    Queue and workers live in the process, so anything still active at startup is
+    a leftover. Left alone it would block its card from ever being resubmitted.
+    """
+    store.jobs.create("queued-job", "card_feature", BANK, CARD_URL, card_key=card_key)
+    store.jobs.create("running-job", "card_list", BANK, CARD_URL)
+    store.jobs.mark_running("running-job")
+    store.jobs.create("done-job", "card_list", BANK, CARD_URL)
+    store.jobs.mark_completed("done-job")
+
+    reconciled = store.jobs.fail_orphaned_jobs("Interrupted by a service restart.")
+
+    assert reconciled == 2
+    assert store.jobs.get("queued-job").status == "error"
+    assert store.jobs.get("running-job").error == "Interrupted by a service restart."
+    assert store.jobs.get("running-job").finished_at is not None
+    assert store.jobs.get("done-job").status == "completed"  # finished jobs untouched
+    assert store.jobs.find_active_by_card_key(card_key) is None  # card is submittable again
+
+
+def test_reconciling_twice_is_harmless(store):
+    store.jobs.create("job-1", "card_list", BANK, CARD_URL)
+    store.jobs.fail_orphaned_jobs("first")
+
+    assert store.jobs.fail_orphaned_jobs("second") == 0
+    assert store.jobs.get("job-1").error == "first"
+
+
 def test_batch_jobs_stay_grouped(store):
     for i in range(3):
         store.jobs.create(f"job-{i}", "card_list", BANK, CARD_URL, batch_id="batch-1")

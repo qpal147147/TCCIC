@@ -23,14 +23,14 @@ async def lifespan(app: FastAPI):
         vector_storage_url=global_settings.VECTOR_CLIENT_URL,
         collection_name=global_settings.VECTOR_COLLECTION_NAME
     )
-    # Apply any pending migrations before anything reads the store, so a fresh
-    # checkout or a deleted database file starts working without a manual step.
-    # Failing here is deliberate: a service with no schema cannot serve requests.
+
+    # Apply any pending migrations before anything reads the store
     upgrade_schema(global_settings.METADATA_DB_PATH)
 
-    # One store shared by the request handlers and the worker threads; its
-    # repositories open a session per call, so this is safe to hand around.
     store = Store(global_settings.METADATA_DB_PATH)
+    orphaned = store.jobs.fail_orphaned_jobs("Interrupted by a service restart.")
+    if orphaned:
+        logger.warning(f"Reconciled {orphaned} job(s) left unfinished by a previous run.")
 
     feature_queue: asyncio.Queue = asyncio.Queue(maxsize=global_settings.CRAWL_QUEUE_MAX_SIZE)
     list_queue: asyncio.Queue = asyncio.Queue(maxsize=global_settings.CRAWL_QUEUE_MAX_SIZE)
