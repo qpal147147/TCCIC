@@ -95,10 +95,16 @@ class RAG():
         embedding_batch_size: int | None = None,
     ) -> tuple[int, int]:
         """
-        Summarize card feature images via LLM, embed the summaries, and insert into Milvus.
+        Summarize card feature images via LLM, embed the summaries, and replace
+        the card's vectors in Milvus with the result.
+
+        The card's existing vectors are dropped only at the moment the new ones
+        are written, so a run that summarizes nothing leaves the previous
+        content in place rather than emptying the card.
 
         Returns:
             (success_count, fail_count) — number of images successfully processed vs skipped.
+            A success_count of 0 means nothing was written and nothing was removed.
         """
         with open(feature_jsonl_path, "r", encoding="utf-8") as f:
             feature_data = [json.loads(line) for line in f]
@@ -179,8 +185,10 @@ class RAG():
             )
             for result, embedding in zip(all_results, embedding_texts)
         ]
+        
+        self.vector_manager.delete(key="card_id", value=card_id)
         self.vector_manager.insert(items)
-        logger.info(f"Inserted {len(items)} records into Milvus for card '{card_name}' ({bank_code}).")
+        logger.info(f"Replaced Milvus records for card '{card_name}' ({bank_code}) with {len(items)} new ones.")
 
         return len(all_results), total_failed
 

@@ -142,27 +142,6 @@ def run_card_list_spider(spider_data: list[CardListSpiderData], store: Store):
             store.jobs.mark_failed(data.job_id, str(e))
 
 
-async def _replace_card_vectors(
-    rag: RAG,
-    feature_jsonl_path: Path,
-    data: CardFeatureSpiderData,
-) -> tuple[int, int]:
-    """
-    Rebuild a card's vectors from scratch.
-
-    Deleting first makes a re-crawl a replacement rather than an accumulation;
-    without it the same card_key would end up holding both the old and the new
-    content in the collection.
-    """
-    await rag.delete_card(data.card_key)
-    return await rag.chunk_images_to_vecdb(
-        feature_jsonl_path,
-        data.card_key,
-        data.card_name,
-        data.bank_code,
-    )
-
-
 def run_card_feature_spider(spider_data: list[CardFeatureSpiderData], store: Store):
     """
     Runs the card-feature spider once per item, then vectorizes the results.
@@ -205,14 +184,29 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData], store: Sto
                     )
 
                 image_count = sum(1 for _ in open(feature_jsonl_path, encoding="utf-8"))
-                success, failed = asyncio.run(_replace_card_vectors(rag, feature_jsonl_path, data))
+                success, failed = asyncio.run(rag.chunk_images_to_vecdb(
+                    feature_jsonl_path,
+                    data.card_key,
+                    data.card_name,
+                    data.bank_code,
+                ))
+                stats = {"images": image_count, "vectorized": success, "failed": failed}
+
+                if success == 0:
+                    logger.error(f"Vectorization produced no summaries for '{data.card_name}'.")
+                    store.jobs.mark_failed(
+                        data.job_id,
+                        f"Vectorization produced no summaries ({failed} image(s) failed).",
+                        stats=stats,
+                    )
+                    continue
 
                 # last_changed_at is deliberately left unset: until content hashing
                 # lands there is no way to tell a real change from an identical re-crawl.
                 store.cards.mark_crawled(data.card_key)
                 store.jobs.mark_completed(
                     data.job_id,
-                    stats={"images": image_count, "vectorized": success, "failed": failed},
+                    stats=stats,
                     artifact_dir=str(feature_dir),
                 )
                 logger.info(f"Card information saved to vector database ({success} ok, {failed} failed).")
@@ -422,7 +416,7 @@ async def batch_card_feature(request: Request, body: list[CardFeatureRequest]):
 
         for req in body:
             card = store.cards.upsert(req.bank_code, req.card_name, req.card_url)
-            
+
             active = store.jobs.find_active_by_card_key(card.card_key)
             if active is not None:
                 duplicates += 1
