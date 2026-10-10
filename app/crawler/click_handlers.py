@@ -18,9 +18,16 @@ _click_button()      -- utility: click the first visible element from a Locator 
 
 import logging
 from dataclasses import dataclass
+from typing import Optional
 
 from playwright.async_api import Page, Locator, TimeoutError, Error as PlaywrightError
 
+from app.crawler.content_hash import (
+    Fingerprint,
+    fingerprint_locator,
+    fingerprint_page,
+    freeze_animations,
+)
 from app.crawler.schemas.bank_config import FocusItem
 
 
@@ -30,9 +37,14 @@ from app.crawler.schemas.bank_config import FocusItem
 
 @dataclass
 class ClickResult:
-    """The page URL and saved image path produced by a single link click."""
+    """
+    What a single link click produced: the page URL, the saved screenshot, and
+    the fingerprint of whatever region was captured. The fingerprint is None when
+    the region could not be read.
+    """
     page_url: str
     image_path: str
+    fingerprint: Optional[Fingerprint] = None
 
 
 # ---------------------------------------------------------------------------
@@ -59,10 +71,17 @@ class NewTabHandler:
     then returns. The caller is responsible for closing the new tab.
     """
 
-    async def handle(self, new_page: Page, image_path: str) -> ClickResult:
+    async def handle(self, new_page: Page, image_path: str, logger: logging.Logger) -> ClickResult:
         await new_page.wait_for_load_state("load")
+        # The new tab is a page in its own right and needs the same treatment as
+        # the one we started from.
+        await freeze_animations(new_page, logger)
         await new_page.screenshot(path=image_path, full_page=True)
-        return ClickResult(page_url=new_page.url, image_path=image_path)
+        return ClickResult(
+            page_url=new_page.url,
+            image_path=image_path,
+            fingerprint=await fingerprint_page(new_page, logger),
+        )
 
 
 class RedirectHandler:
@@ -73,9 +92,14 @@ class RedirectHandler:
     links in the same focus area can still be reached.
     """
 
-    async def handle(self, page: Page, image_path: str) -> ClickResult:
+    async def handle(self, page: Page, image_path: str, logger: logging.Logger) -> ClickResult:
         await page.screenshot(path=image_path, full_page=True)
-        result = ClickResult(page_url=page.url, image_path=image_path)
+        # Fingerprint before navigating back, while the captured page is still loaded.
+        result = ClickResult(
+            page_url=page.url,
+            image_path=image_path,
+            fingerprint=await fingerprint_page(page, logger),
+        )
         await page.go_back(wait_until="load")
         return result
 
@@ -104,13 +128,22 @@ class PopupHandler:
         captured = await self._screenshot_popup(
             page, focus_item, focus_content_locator, image_path
         )
-        if not captured:
+        if captured is None:
             logger.warning(
                 "Popup content locator matched nothing visible; "
                 "fell back to focus-area screenshot."
             )
+
+        # Fingerprint exactly the region that was screenshotted, and do it before
+        # the popup is dismissed.
+        fingerprint = await fingerprint_locator(captured or focus_content_locator, logger)
+
         await self._close_popup(page, focus_item)
-        return ClickResult(page_url=page.url, image_path=image_path)
+        return ClickResult(
+            page_url=page.url,
+            image_path=image_path,
+            fingerprint=fingerprint,
+        )
 
     async def _screenshot_popup(
         self,
@@ -118,11 +151,12 @@ class PopupHandler:
         focus_item: FocusItem,
         focus_content_locator: Locator,
         image_path: str,
-    ) -> bool:
+    ) -> Optional[Locator]:
         """
         Try to screenshot the popup region defined in focus_item.popup.content.
         Falls back to the focus area if the popup element is not visible.
-        Returns True if the popup was captured, False if the fallback was used.
+
+        Returns the locator that was captured, or None when the fallback was used
         """
         if focus_item.popup and focus_item.popup.content:
             popup_locators = await page.locator(
@@ -131,11 +165,11 @@ class PopupHandler:
             for locator in popup_locators:
                 if await locator.is_visible():
                     await locator.screenshot(path=image_path)
-                    return True
+                    return locator
 
         # Fallback: screenshot the focus area itself
         await focus_content_locator.screenshot(path=image_path)
-        return False
+        return None
 
     async def _close_popup(self, page: Page, focus_item: FocusItem) -> None:
         """Click the configured close button and wait for the DOM to settle."""
@@ -185,7 +219,7 @@ async def click_and_capture(
         # Case 1: a new tab opened
         new_page = await new_page_info.value
         logger.info(f"Case 1 (new tab): {new_page.url}")
-        return await NewTabHandler().handle(new_page, image_path)
+        return await NewTabHandler().handle(new_page, image_path, logger)
 
     except TimeoutError:
         await page.wait_for_load_state("load")
@@ -193,7 +227,7 @@ async def click_and_capture(
         if page.url.split("#")[0] != original_url:
             # Case 2: current page redirected to a new URL
             logger.info(f"Case 2 (redirect): {page.url}")
-            return await RedirectHandler().handle(page, image_path)
+            return await RedirectHandler().handle(page, image_path, logger)
         else:
             # Case 3: URL unchanged — an in-page popup likely appeared
             logger.info("Case 3 (popup): URL unchanged, capturing popup content.")

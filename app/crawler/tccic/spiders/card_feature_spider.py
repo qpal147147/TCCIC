@@ -95,6 +95,7 @@ class CardFeatureSpider(scrapy.Spider):
 
         try:
             await interactor.handle_cookie_banner()
+            await interactor.freeze_animations()
             yield await interactor.capture_main_page()
             async for item in interactor.process_all_focus_areas():
                 yield item

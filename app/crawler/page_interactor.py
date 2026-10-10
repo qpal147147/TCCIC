@@ -17,9 +17,21 @@ from typing import AsyncGenerator
 
 from playwright.async_api import Page, TimeoutError, Error as PlaywrightError
 
+from app.crawler.content_hash import Fingerprint, fingerprint_page, freeze_animations
 from app.crawler.tccic.items import FeatureItem
 from app.crawler.schemas.bank_config import BankConfig, FeatureConfig, FocusItem
 from app.crawler.click_handlers import click_and_capture, _click_button
+
+
+def _feature_item(page_url: str, image_path: str, fingerprint: Fingerprint | None) -> FeatureItem:
+    """Build a FeatureItem, leaving the fingerprint fields empty if it could not be taken."""
+    return FeatureItem(
+        page_url=page_url,
+        image_path=image_path,
+        content_hash=fingerprint.content_hash if fingerprint else None,
+        text_len=fingerprint.text_len if fingerprint else None,
+        img_count=fingerprint.img_count if fingerprint else None,
+    )
 
 
 class PageInteractor:
@@ -66,6 +78,13 @@ class PageInteractor:
         cookie_btn = self._page.locator(f"xpath={selector}")
         await _click_button(cookie_btn)
 
+    async def freeze_animations(self) -> None:
+        """
+        Stop animations and transitions before anything is captured, so a
+        screenshot shows the page at rest rather than mid-slide.
+        """
+        await freeze_animations(self._page, self._logger)
+
     async def capture_main_page(self) -> FeatureItem:
         """
         Scroll to the bottom to trigger lazy-loaded content, then take a
@@ -74,8 +93,9 @@ class PageInteractor:
         await self._scroll_to_bottom()
         image_path = str(self._image_dir / "main.png")
         await self._page.screenshot(path=image_path, full_page=True)
-        self._logger.info(f"Main page captured: {image_path}")
-        return FeatureItem(page_url=self._page.url, image_path=image_path)
+        fingerprint = await fingerprint_page(self._page, self._logger)
+        self._logger.info(f"Main page captured: {image_path} (fingerprint: {fingerprint}).")
+        return _feature_item(self._page.url, image_path, fingerprint)
 
     async def process_all_focus_areas(self) -> AsyncGenerator[FeatureItem, None]:
         """
@@ -164,9 +184,10 @@ class PageInteractor:
                         self._logger,
                     )
                     if result:
-                        yield FeatureItem(
-                            page_url=result.page_url,
-                            image_path=result.image_path,
+                        yield _feature_item(
+                            result.page_url,
+                            result.image_path,
+                            result.fingerprint,
                         )
 
                 except PlaywrightError as e:
@@ -196,3 +217,11 @@ class PageInteractor:
             await self._page.wait_for_load_state("load", timeout=3000)
         except TimeoutError:
             self._logger.debug("Page load timed out after scrolling; continuing anyway.")
+
+        # Lazy-loaded images finish arriving after 'load', and an image still in
+        # flight is both a worse screenshot and a different fingerprint. Pages
+        # that poll in the background never go idle, so this is best-effort.
+        try:
+            await self._page.wait_for_load_state("networkidle", timeout=5000)
+        except TimeoutError:
+            self._logger.debug("Network did not go idle after scrolling; continuing anyway.")
