@@ -33,7 +33,7 @@ class OpenAIConfig(BaseModelConfig):
 class GeminiConfig(BaseModelConfig):
     """Gemini model config"""
     api_key: SecretStr
-    chat_model_name: str = "gemma-4-31b-it"
+    chat_model_name: str = "gemini-3.5-flash-lite"
     temperature: float = 0.5
     max_tokens: int = 65536
     embedding_model_name: str = "gemini-embedding-001"

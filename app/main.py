@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
     for w in workers:
         w.cancel()
     await asyncio.gather(*workers, return_exceptions=True)
-    await rag.close()
+    rag.close()
     store.close()
     logger.info("FastAPI is down")
 
