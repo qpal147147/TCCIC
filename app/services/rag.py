@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 from typing import Optional
@@ -8,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 from app.services.llm_factory import LLMFactory
 from app.services.milvus import MilvusManager
-from app.services.schema import VectorDatabaseData, SourceData, LLMResponse, CardInfo
+from app.services.schema import VectorDatabaseData, SourceData, LLMResponse, CardInfo, VectorizeResult
+from app.services.store import ChunkInput, Store
 from app.configs.global_settings import global_settings
 
 _QA_SYSTEM_PROMPT = """
@@ -64,6 +66,8 @@ _SUMMARY_PROMPT = """
    指定通路單筆消費需滿額才有回饋。
 """.strip()
 
+_PROMPT_VER = hashlib.sha256(_SUMMARY_PROMPT.encode("utf-8")).hexdigest()[:12]
+
 
 class RAG():
     def __init__(
@@ -85,112 +89,148 @@ class RAG():
         )
         self.vector_manager.create_collection()
 
-    async def chunk_images_to_vecdb(
+    async def analyze_images_to_vecdb(
         self,
         feature_jsonl_path: str | Path,
         card_id: str,
         card_name: str,
         bank_code: str,
+        store: Store,
+        model_timeout: float = 20.0,
         retry_count: int = 3,
         embedding_batch_size: int | None = None,
-    ) -> tuple[int, int]:
+    ) -> VectorizeResult:
         """
         Summarize card feature images via LLM, embed the summaries, and replace
         the card's vectors in Milvus with the result.
 
-        The card's existing vectors are dropped only at the moment the new ones
-        are written, so a run that summarizes nothing leaves the previous
-        content in place rather than emptying the card.
+        Summaries are reused per image whenever the captured content fingerprints
+        the same as a previous crawl.
 
-        Returns:
-            (success_count, fail_count) — number of images successfully processed vs skipped.
-            A success_count of 0 means nothing was written and nothing was removed.
+        If any image fails to summarize, the card keeps the vectors it already 
+        had and `vectorized` comes back 0. Summaries that did succeed are still cached, 
+        so a retry only pays for the images that failed.
         """
         with open(feature_jsonl_path, "r", encoding="utf-8") as f:
-            feature_data = [json.loads(line) for line in f]
+            rows = [json.loads(line) for line in f if line.strip()]
 
-        tasks = [(data["page_url"], data["image_path"]) for data in feature_data]
-        logger.info(f"Starting LLM summarization for card '{card_name}' ({bank_code}): {len(tasks)} images, batch_size={self._llm_batch_size}.")
+        model_name = self.llm.model_config.chat_model_name
+        entries = [
+            {
+                "url": row["page_url"],
+                "image": row["image_path"],
+                "hash": row.get("content_hash"),
+                "summary": None,
+            }
+            for row in rows
+        ]
 
-        all_results: list[dict] = []
-        total_failed = 0
+        for entry in entries:
+            entry["summary"] = store.summaries.get(entry["hash"], model_name, _PROMPT_VER)
 
-        for i in range(0, len(tasks), self._llm_batch_size):
-            batch_tasks = tasks[i:i + self._llm_batch_size]
-            batch_num = i // self._llm_batch_size + 1
-            logger.info(f"Processing LLM batch {batch_num}: images {i + 1}–{i + len(batch_tasks)} of {len(tasks)}.")
+        pending = [e for e in entries if e["summary"] is None]
+        cached = len(entries) - len(pending)
+        logger.info(
+            f"Vectorizing card '{card_name}' ({bank_code}): {len(entries)} images — "
+            f"{cached} reused from cache, {len(pending)} to summarize (batch_size={self._llm_batch_size})."
+        )
 
-            coroutines = [self.llm.chat(_SUMMARY_PROMPT, [image_path]) for _, image_path in batch_tasks]
-            batch_responses = await asyncio.gather(*coroutines, return_exceptions=True)
+        failed = 0
+        for i in range(0, len(pending), self._llm_batch_size):
+            batch = pending[i:i + self._llm_batch_size]
+            logger.info(f"Processing LLM batch {i // self._llm_batch_size + 1}: {len(batch)} image(s).")
 
-            batch_results = [
-                {"url": page_url, "image": image_path, "response": response}
-                for (page_url, image_path), response in zip(batch_tasks, batch_responses)
-            ]
+            responses = await asyncio.gather(
+                *(
+                    asyncio.wait_for(self.llm.chat(_SUMMARY_PROMPT, [e["image"]]), timeout=model_timeout)
+                    for e in batch
+                ),
+                return_exceptions=True,
+            )
 
-            # retry failed items individually
-            for result in batch_results:
+            for entry, response in zip(batch, responses):
+                # retry failed items individually
                 for attempt in range(retry_count):
-                    if not isinstance(result["response"], Exception):
+                    if not isinstance(response, Exception):
                         break
-                    logger.warning(f"Retry {attempt + 1}/{retry_count} for image: {result['image']}.")
+                    logger.warning(f"Retry {attempt + 1}/{retry_count} for image: {entry['image']}.")
                     try:
-                        result["response"] = await self.llm.chat(_SUMMARY_PROMPT, [result["image"]])
+                        response = await asyncio.wait_for(
+                            self.llm.chat(_SUMMARY_PROMPT, [entry["image"]]), timeout=model_timeout
+                        )
                     except Exception as e:
-                        result["response"] = e
+                        response = e
 
-                if isinstance(result["response"], Exception):
+                if isinstance(response, Exception):
                     logger.error(
-                        f"Skipping image after {retry_count} retries: {result['image']}. "
-                        f"Error: {result['response']}"
+                        f"Skipping image after {retry_count} retries: {entry['image']}. Error: {response}"
                     )
-                    total_failed += 1
+                    failed += 1
+                    continue
 
-            succeeded = [r for r in batch_results if not isinstance(r["response"], Exception)]
-            all_results.extend(succeeded)
+                entry["summary"] = response
+                store.summaries.put(entry["hash"], model_name, _PROMPT_VER, response)
 
             # flow restrictions vary by model — skip sleep after the last batch
-            if i + self._llm_batch_size < len(tasks) and self._rate_limit_sleep_s > 0:
+            if i + self._llm_batch_size < len(pending) and self._rate_limit_sleep_s > 0:
                 logger.info(f"Rate-limit pause: sleeping {self._rate_limit_sleep_s}s before next batch.")
                 await asyncio.sleep(self._rate_limit_sleep_s)
 
-        logger.info(f"LLM summarization complete: {len(all_results)} succeeded, {total_failed} failed.")
+        # Original JSONL order, so chunk order matches what was inserted.
+        ready = [e for e in entries if e["summary"] is not None]
+        summarized = len(ready) - cached
+        logger.info(f"Summarization complete: {cached} cached, {summarized} generated, {failed} failed.")
 
-        if not all_results:
-            logger.warning("No successful summaries to embed or insert; returning early.")
-            return 0, total_failed
-
-        # embed summaries
-        logger.info(f"Embedding {len(all_results)} summaries (embedding_batch_size={embedding_batch_size}).")
-        if embedding_batch_size:
-            embedding_texts: list = []
-            for j in range(0, len(all_results), embedding_batch_size):
-                batch = [r["response"] for r in all_results[j:j + embedding_batch_size]]
-                embedding_texts.extend(await self.embedding.create_embeddings(batch))
-        else:
-            embedding_texts = await self.embedding.create_embeddings(
-                [r["response"] for r in all_results]
+        if failed:
+            logger.warning(f"Aborting vectorization of '{card_name}': {failed} of {len(entries)} image(s).")
+            return VectorizeResult(
+                images=len(entries), cached=cached, summarized=summarized, failed=failed, vectorized=0
             )
+
+        if not ready:
+            logger.warning(f"Nothing to vectorize for '{card_name}': the crawl produced no images.")
+            return VectorizeResult(images=0, cached=0, summarized=0, failed=0, vectorized=0)
+
+        logger.info(f"Embedding {len(ready)} summaries (embedding_batch_size={embedding_batch_size}).")
+        summaries = [e["summary"] for e in ready]
+        if embedding_batch_size:
+            embedding_texts = []
+            for j in range(0, len(summaries), embedding_batch_size):
+                embedding_texts.extend(
+                    await self.embedding.create_embeddings(summaries[j:j + embedding_batch_size])
+                )
+        else:
+            embedding_texts = await self.embedding.create_embeddings(summaries)
         logger.info("Embedding complete.")
 
-        # store in vector database
         items = [
             VectorDatabaseData(
-                text=result["response"],
+                text=entry["summary"],
                 vector=embedding,
-                url=result["url"],
+                url=entry["url"],
                 card_id=card_id,
                 card_name=card_name,
                 bank_code=bank_code,
             )
-            for result, embedding in zip(all_results, embedding_texts)
+            for entry, embedding in zip(ready, embedding_texts)
         ]
-        
+
         self.vector_manager.delete(key="card_id", value=card_id)
         self.vector_manager.insert(items)
         logger.info(f"Replaced Milvus records for card '{card_name}' ({bank_code}) with {len(items)} new ones.")
 
-        return len(all_results), total_failed
+        store.chunks.replace_for_card(card_id, [
+            ChunkInput(seq=seq, page_url=entry["url"], content_hash=entry["hash"])
+            for seq, entry in enumerate(ready)
+        ])
+
+        return VectorizeResult(
+            images=len(entries),
+            cached=cached,
+            summarized=summarized,
+            failed=failed,
+            vectorized=len(ready),
+        )
 
 
     async def list_cards(self, bank_code: Optional[str] = None) -> list[CardInfo]:
@@ -225,5 +265,5 @@ class RAG():
         )
 
 
-    async def close(self):
+    def close(self):
         self.vector_manager.close()

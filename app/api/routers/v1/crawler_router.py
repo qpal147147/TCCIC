@@ -183,33 +183,32 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData], store: Sto
                         collection_name=global_settings.VECTOR_COLLECTION_NAME
                     )
 
-                image_count = sum(1 for _ in open(feature_jsonl_path, encoding="utf-8"))
-                success, failed = asyncio.run(rag.chunk_images_to_vecdb(
+                result = asyncio.run(rag.analyze_images_to_vecdb(
                     feature_jsonl_path,
                     data.card_key,
                     data.card_name,
                     data.bank_code,
+                    store,
                 ))
-                stats = {"images": image_count, "vectorized": success, "failed": failed}
+                stats = result.model_dump()
 
-                if success == 0:
-                    logger.error(f"Vectorization produced no summaries for '{data.card_name}'.")
+                if result.vectorized == 0:
+                    reason = f"{result.failed} of {result.images} failed to be vectorized."
+                    logger.error(f"Vectorization aborted for '{data.card_name}': {reason}.")
                     store.jobs.mark_failed(
                         data.job_id,
-                        f"Vectorization produced no summaries ({failed} image(s) failed).",
+                        f"Vectorization aborted: {reason}. The card's existing vectors were kept.",
                         stats=stats,
                     )
                     continue
 
-                # last_changed_at is deliberately left unset: until content hashing
-                # lands there is no way to tell a real change from an identical re-crawl.
-                store.cards.mark_crawled(data.card_key)
+                store.cards.mark_crawled(data.card_key, content_changed=result.summarized > 0)
                 store.jobs.mark_completed(
                     data.job_id,
                     stats=stats,
                     artifact_dir=str(feature_dir),
                 )
-                logger.info(f"Card information saved to vector database ({success} ok, {failed} failed).")
+                logger.info(f"Card vectorized: {result.cached} cached, {result.summarized} generated, {result.failed} failed.")
             except Exception as e:
                 logger.error(f"An error occurred during card feature crawling: {e}")
                 store.jobs.mark_failed(data.job_id, str(e))

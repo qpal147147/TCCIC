@@ -1,9 +1,11 @@
 """
-Tests for how a card's vectors are replaced.
+Tests for how a card is vectorized: which images reach the model, and how the
+card's vectors are replaced.
 
-The LLM, embedder and Milvus are stubbed, so these run offline and cover the
-ordering that matters: a card must never be left empty because summarization
-failed.
+The LLM, embedder and Milvus are stubbed and the store runs in memory, so these
+run offline and cover the two things that matter — a card must never be left
+empty because summarization failed, and unchanged content must not be paid for
+twice.
 
 Using: pytest tests/test_rag_vectorize.py
 """
@@ -13,23 +15,36 @@ import json
 
 import pytest
 
-from app.services.rag import RAG
+from app.services.rag import _PROMPT_VER, RAG
+from app.services.store import Store
 
 CARD_KEY = "0f5a1c9de4b27a3f8c6d0e1b2a394857c6d0e1b2"
+MODEL = "stub-vision-model"
+
+
+class StubModelConfig:
+    chat_model_name = MODEL
 
 
 class StubLLM:
-    """Summarizes images, or fails every call the way an outage does."""
+    """
+    Summarizes images. `fail` reproduces a provider outage; `fail_for` singles
+    out one image, which is how a partial failure gets exercised.
+    """
 
-    def __init__(self, fail: bool = False):
+    model_config = StubModelConfig()
+
+    def __init__(self, fail: bool = False, fail_for: set[str] | None = None):
         self.fail = fail
-        self.calls = 0
+        self.fail_for = fail_for or set()
+        self.seen: list[str] = []
 
     async def chat(self, prompt, images=None, structured_schema=None):
-        self.calls += 1
-        if self.fail:
+        image = images[0]
+        self.seen.append(image)
+        if self.fail or image in self.fail_for:
             raise RuntimeError("HTTP/1.1 500 Internal Server Error")
-        return f"摘要 {images[0]}"
+        return f"摘要 {image}"
 
 
 class StubEmbedding:
@@ -50,15 +65,12 @@ class StubVectorManager:
         self.events.append(("insert", len(data)))
 
 
-def build_rag(llm: StubLLM) -> RAG:
-    # Bypass __init__: it would reach for a real Milvus and a real provider.
-    rag = RAG.__new__(RAG)
-    rag.llm = llm
-    rag.embedding = StubEmbedding()
-    rag.vector_manager = StubVectorManager()
-    rag._rate_limit_sleep_s = 0
-    rag._llm_batch_size = 10
-    return rag
+@pytest.fixture
+def store():
+    s = Store(":memory:")
+    s.create_all()
+    yield s
+    s.close()
 
 
 @pytest.fixture
@@ -84,46 +96,206 @@ def jsonl(tmp_path):
     return _write
 
 
-def vectorize(rag: RAG, path) -> tuple[int, int]:
-    return asyncio.run(rag.chunk_images_to_vecdb(path, CARD_KEY, "測試卡", "taishin"))
+def build_rag(llm: StubLLM) -> RAG:
+    # Bypass __init__: it would reach for a real Milvus and a real provider.
+    rag = RAG.__new__(RAG)
+    rag.llm = llm
+    rag.embedding = StubEmbedding()
+    rag.vector_manager = StubVectorManager()
+    rag._rate_limit_sleep_s = 0
+    rag._llm_batch_size = 10
+    return rag
 
 
-def test_total_failure_leaves_the_existing_vectors_alone(jsonl):
+def vectorize(rag: RAG, path, store: Store):
+    return asyncio.run(
+        rag.analyze_images_to_vecdb(path, CARD_KEY, "測試卡", "taishin", store)
+    )
+
+
+def seed_cache(store: Store, *indexes: int):
+    for i in indexes:
+        store.summaries.put(f"hash-{i}", MODEL, _PROMPT_VER, f"快取摘要 {i}")
+
+
+# --- failure handling --------------------------------------------------------
+
+def test_total_failure_leaves_the_existing_vectors_alone(jsonl, store):
     """
     An LLM outage must not empty a card that was working. Deleting before the
-    replacement exists would do exactly that, and the caller would see a card
-    with no vectors at all.
+    replacement exists would do exactly that, and the caller would be left with
+    a card holding no vectors at all.
     """
     rag = build_rag(StubLLM(fail=True))
 
-    success, failed = vectorize(rag, jsonl(3))
+    result = vectorize(rag, jsonl(3), store)
 
-    assert (success, failed) == (0, 3)
+    assert (result.vectorized, result.failed) == (0, 3)
     assert rag.vector_manager.events == []  # nothing deleted, nothing inserted
+    assert store.chunks.list_for_card(CARD_KEY) == []
 
 
-def test_a_successful_run_replaces_rather_than_accumulates(jsonl):
+def test_one_failed_image_aborts_the_whole_replacement(jsonl, store):
+    """
+    A card indexed with two thirds of its content is indistinguishable from a
+    complete one once it is being searched, so the previous complete snapshot is
+    kept instead of being replaced by a partial one.
+    """
+    rag = build_rag(StubLLM(fail_for={"1.png"}))
+
+    result = vectorize(rag, jsonl(3), store)
+
+    assert (result.summarized, result.failed, result.vectorized) == (2, 1, 0)
+    assert rag.vector_manager.events == []  # the old vectors stay exactly as they were
+    assert store.chunks.list_for_card(CARD_KEY) == []
+
+
+def test_what_succeeded_is_cached_so_a_retry_is_cheap(jsonl, store):
+    """
+    What makes all-or-nothing affordable: the summaries that worked are cached as
+    they arrive, so the retry only pays for the image that failed.
+    """
+    path = jsonl(3)
+    vectorize(build_rag(StubLLM(fail_for={"1.png"})), path, store)
+    assert store.summaries.stats()["entries"] == 2
+
+    retry = build_rag(StubLLM())
+    result = vectorize(retry, path, store)
+
+    assert retry.llm.seen == ["1.png"]  # the model is asked about nothing else
+    assert (result.cached, result.summarized, result.vectorized) == (2, 1, 3)
+    assert retry.vector_manager.events == [("delete", CARD_KEY), ("insert", 3)]
+
+
+def test_a_failed_image_is_not_cached(jsonl, store):
+    """Caching an outage would serve the error back on every later crawl."""
+    rag = build_rag(StubLLM(fail=True))
+
+    vectorize(rag, jsonl(1), store)
+
+    assert store.summaries.stats()["entries"] == 0
+
+
+def test_failed_images_are_retried_before_being_given_up_on(jsonl, store):
+    rag = build_rag(StubLLM(fail=True))
+
+    vectorize(rag, jsonl(1), store)
+
+    assert len(rag.llm.seen) == 4  # the first attempt plus three retries
+
+
+# --- vector replacement ------------------------------------------------------
+
+def test_a_successful_run_replaces_rather_than_accumulates(jsonl, store):
     rag = build_rag(StubLLM())
 
-    success, failed = vectorize(rag, jsonl(3))
+    result = vectorize(rag, jsonl(3), store)
 
-    assert (success, failed) == (3, 0)
+    assert (result.images, result.vectorized, result.failed) == (3, 3, 0)
     assert rag.vector_manager.events == [("delete", CARD_KEY), ("insert", 3)]
 
 
-def test_the_delete_happens_only_once_there_is_something_to_write(jsonl):
+def test_the_delete_happens_only_once_there_is_something_to_write(jsonl, store):
     """Ordering is the whole point: the old content survives until the new is ready."""
     rag = build_rag(StubLLM())
 
-    vectorize(rag, jsonl(2))
+    vectorize(rag, jsonl(2), store)
 
     actions = [event[0] for event in rag.vector_manager.events]
     assert actions.index("delete") < actions.index("insert")
 
 
-def test_failed_images_are_retried_before_being_given_up_on(jsonl):
-    rag = build_rag(StubLLM(fail=True))
+# --- summary cache -----------------------------------------------------------
 
-    vectorize(rag, jsonl(1))
+def test_an_unchanged_card_costs_no_model_calls(jsonl, store):
+    """The point of fingerprinting: a re-crawl that found nothing new is free."""
+    seed_cache(store, 0, 1, 2)
+    rag = build_rag(StubLLM())
 
-    assert rag.llm.calls == 4  # the first attempt plus three retries
+    result = vectorize(rag, jsonl(3), store)
+
+    assert rag.llm.seen == []  # the vision model was never called
+    assert (result.cached, result.summarized, result.vectorized) == (3, 0, 3)
+    assert rag.vector_manager.events == [("delete", CARD_KEY), ("insert", 3)]
+
+
+def test_only_the_changed_images_reach_the_model(jsonl, store):
+    """A partial hit pays for the misses alone, not for the whole card."""
+    seed_cache(store, 0, 2)
+    rag = build_rag(StubLLM())
+
+    result = vectorize(rag, jsonl(3), store)
+
+    assert rag.llm.seen == ["1.png"]
+    assert (result.cached, result.summarized) == (2, 1)
+    assert rag.vector_manager.events == [("delete", CARD_KEY), ("insert", 3)]
+
+
+def test_fresh_summaries_are_cached_for_next_time(jsonl, store):
+    rag = build_rag(StubLLM())
+
+    vectorize(rag, jsonl(2), store)
+
+    assert store.summaries.get("hash-0", MODEL, _PROMPT_VER) == "摘要 0.png"
+    assert store.summaries.stats()["entries"] == 2
+
+
+def test_a_second_run_reuses_what_the_first_one_stored(jsonl, store):
+    """End to end: crawl twice, pay once."""
+    path = jsonl(3)
+    vectorize(build_rag(StubLLM()), path, store)
+
+    second = build_rag(StubLLM())
+    result = vectorize(second, path, store)
+
+    assert second.llm.seen == []
+    assert result.cached == 3
+
+
+def test_a_different_model_does_not_reuse_the_old_summaries(jsonl, store):
+    """Switching provider must not serve summaries the new model never wrote."""
+    store.summaries.put("hash-0", "some-other-model", _PROMPT_VER, "別的模型的摘要")
+    rag = build_rag(StubLLM())
+
+    result = vectorize(rag, jsonl(1), store)
+
+    assert rag.llm.seen == ["0.png"]
+    assert result.cached == 0
+
+
+# --- card composition --------------------------------------------------------
+
+def test_chunks_record_what_the_card_now_consists_of(jsonl, store):
+    """
+    card_chunks plus the summary cache are what make the collection rebuildable
+    without crawling or paying for a model call.
+    """
+    rag = build_rag(StubLLM())
+
+    vectorize(rag, jsonl(3), store)
+
+    chunks = store.chunks.list_for_card(CARD_KEY)
+    assert [c.content_hash for c in chunks] == ["hash-0", "hash-1", "hash-2"]
+    assert [c.seq for c in chunks] == [0, 1, 2]
+    assert chunks[0].page_url == "https://bank.test/card#0"
+
+
+def test_chunks_keep_the_order_the_vectors_were_inserted_in(jsonl, store):
+    """A cached image must stay in its original position, not sort to the front."""
+    seed_cache(store, 1)
+    rag = build_rag(StubLLM())
+
+    vectorize(rag, jsonl(3), store)
+
+    assert [c.content_hash for c in store.chunks.list_for_card(CARD_KEY)] == [
+        "hash-0", "hash-1", "hash-2",
+    ]
+
+
+def test_a_shrinking_card_drops_its_stale_chunks(jsonl, store):
+    rag = build_rag(StubLLM())
+    vectorize(rag, jsonl(3), store)
+
+    vectorize(build_rag(StubLLM()), jsonl(1), store)
+
+    assert len(store.chunks.list_for_card(CARD_KEY)) == 1
