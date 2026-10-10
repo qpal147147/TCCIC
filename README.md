@@ -57,6 +57,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Record the crawler status to the SQLite database.
 - [x] Add `jobs` API has been added to replace the previous query endpoint. The query now uses the `job_id`, and the easily confused `card_id` and `list_id` have been removed.
 - [x] Prevent duplicate card crawls and check unfinished jobs at system startup.
+- [x] Add summary cache-hit path to reduce LLM usage
 
 </details>
 
