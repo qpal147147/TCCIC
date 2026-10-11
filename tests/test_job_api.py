@@ -42,8 +42,8 @@ class StubRAG:
     def __init__(self):
         self.deleted: list[str] = []
 
-    async def delete_card(self, card_id: str):
-        self.deleted.append(card_id)
+    async def delete_card(self, card_key: str):
+        self.deleted.append(card_key)
 
 
 @pytest.fixture

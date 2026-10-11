@@ -51,8 +51,7 @@ async def delete_card(request: Request, card_key: str):
     rag: RAG = request.state.rag
     store: Store = request.state.store
     try:
-        # Milvus still names the field card_id; the value it holds is the card_key.
-        await rag.delete_card(card_id=card_key)
+        await rag.delete_card(card_key=card_key)
         store.chunks.delete_for_card(card_key)
         store.cards.clear_crawl_state(card_key)
 
@@ -75,7 +74,7 @@ async def card_qa(request: Request, qa_request : QARequest):
     try:
         result = await rag.chat(
             query=qa_request.question,
-            card_id=qa_request.card_key,
+            card_key=qa_request.card_key,
             bank_code=qa_request.bank_code,
         )
 

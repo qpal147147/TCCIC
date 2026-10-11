@@ -208,7 +208,7 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData], store: Sto
                     stats=stats,
                     artifact_dir=str(feature_dir),
                 )
-                logger.info(f"Card vectorized: {result.cached} cached, {result.summarized} generated, {result.failed} failed.")
+                logger.info(f"Card vectorized: {result.cached} cached, {result.summarized} summary, {result.vectorized} vectories generated, {result.failed} failed.")
             except Exception as e:
                 logger.error(f"An error occurred during card feature crawling: {e}")
                 store.jobs.mark_failed(data.job_id, str(e))

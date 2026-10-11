@@ -16,6 +16,7 @@ import json
 import pytest
 
 from app.services.rag import _PROMPT_VER, RAG
+from app.services.schema import ImageSummary, SummarySection
 from app.services.store import Store
 
 CARD_KEY = "0f5a1c9de4b27a3f8c6d0e1b2a394857c6d0e1b2"
@@ -26,17 +27,31 @@ class StubModelConfig:
     chat_model_name = MODEL
 
 
+def summary(*sections: tuple[str, str]) -> ImageSummary:
+    return ImageSummary(sections=[SummarySection(section=s, content=c) for s, c in sections])
+
+
 class StubLLM:
     """
-    Summarizes images. `fail` reproduces a provider outage; `fail_for` singles
-    out one image, which is how a partial failure gets exercised.
+    Transcribes images, one section each unless `sections_for` says otherwise.
+    `fail` reproduces a provider outage; `fail_for` singles out one image, which
+    is how a partial failure gets exercised; `unparseable_for` reproduces a reply
+    the provider could not parse, which arrives as None rather than as an error.
     """
 
     model_config = StubModelConfig()
 
-    def __init__(self, fail: bool = False, fail_for: set[str] | None = None):
+    def __init__(
+        self,
+        fail: bool = False,
+        fail_for: set[str] | None = None,
+        unparseable_for: set[str] | None = None,
+        sections_for: dict[str, list[tuple[str, str]]] | None = None,
+    ):
         self.fail = fail
         self.fail_for = fail_for or set()
+        self.unparseable_for = unparseable_for or set()
+        self.sections_for = sections_for or {}
         self.seen: list[str] = []
 
     async def chat(self, prompt, images=None, structured_schema=None):
@@ -44,7 +59,9 @@ class StubLLM:
         self.seen.append(image)
         if self.fail or image in self.fail_for:
             raise RuntimeError("HTTP/1.1 500 Internal Server Error")
-        return f"摘要 {image}"
+        if image in self.unparseable_for:
+            return None
+        return summary(*self.sections_for.get(image, [("其他", f"內容 {image}")]))
 
 
 class StubEmbedding:
@@ -57,12 +74,14 @@ class StubVectorManager:
 
     def __init__(self):
         self.events: list[tuple] = []
+        self.inserted: list = []
 
     def delete(self, key, value):
         self.events.append(("delete", value))
 
     def insert(self, data):
         self.events.append(("insert", len(data)))
+        self.inserted = list(data)
 
 
 @pytest.fixture
@@ -115,7 +134,9 @@ def vectorize(rag: RAG, path, store: Store):
 
 def seed_cache(store: Store, *indexes: int):
     for i in indexes:
-        store.summaries.put(f"hash-{i}", MODEL, _PROMPT_VER, f"快取摘要 {i}")
+        store.summaries.put(
+            f"hash-{i}", MODEL, _PROMPT_VER, summary(("其他", f"快取內容 {i}")).model_dump_json()
+        )
 
 
 # --- failure handling --------------------------------------------------------
@@ -184,6 +205,70 @@ def test_failed_images_are_retried_before_being_given_up_on(jsonl, store):
     assert len(rag.llm.seen) == 4  # the first attempt plus three retries
 
 
+def test_a_reply_that_cannot_be_parsed_counts_as_a_failure(jsonl, store):
+    """
+    A truncated reply reaches us as None, not as an exception. Left unchecked it
+    would be cached and vectorized as if the image had been read.
+    """
+    rag = build_rag(StubLLM(unparseable_for={"1.png"}))
+
+    result = vectorize(rag, jsonl(3), store)
+
+    assert (result.failed, result.vectorized) == (1, 0)
+    assert rag.llm.seen.count("1.png") == 4  # retried like any other failure
+    assert rag.vector_manager.events == []
+    assert store.summaries.stats()["entries"] == 2
+
+
+# --- sections ----------------------------------------------------------------
+
+def test_each_section_of_an_image_becomes_its_own_record(jsonl, store):
+    rag = build_rag(StubLLM(sections_for={
+        "0.png": [("優惠活動", "活動甲"), ("優惠活動", "活動乙"), ("年費", "首年免年費")],
+    }))
+
+    result = vectorize(rag, jsonl(2), store)
+
+    assert (result.images, result.vectorized) == (2, 4)  # three from 0.png, one from 1.png
+    assert rag.vector_manager.events == [("delete", CARD_KEY), ("insert", 4)]
+
+
+def test_a_record_names_its_card_and_section_in_the_searched_text(jsonl, store):
+    """
+    Only `text` is searched, so a section that does not say whose it is cannot be
+    found by a question that names the card.
+    """
+    rag = build_rag(StubLLM(sections_for={"0.png": [("年費", "首年免年費")]}))
+
+    vectorize(rag, jsonl(1), store)
+
+    record = rag.vector_manager.inserted[0]
+    assert record.text == "測試卡｜年費\n首年免年費"
+    assert (record.section, record.card_key) == ("年費", CARD_KEY)
+    assert record.url == "https://bank.test/card#0"
+
+
+def test_an_image_with_no_card_content_is_not_a_failure(jsonl, store):
+    """A capture of a blank area has nothing to say; that must not abort the card."""
+    rag = build_rag(StubLLM(sections_for={"1.png": []}))
+
+    result = vectorize(rag, jsonl(3), store)
+
+    assert (result.failed, result.vectorized) == (0, 2)
+    assert rag.vector_manager.events == [("delete", CARD_KEY), ("insert", 2)]
+    assert len(store.chunks.list_for_card(CARD_KEY)) == 3  # still part of the card
+
+
+def test_a_card_with_no_content_at_all_leaves_the_existing_vectors_alone(jsonl, store):
+    rag = build_rag(StubLLM(sections_for={"0.png": [], "1.png": []}))
+
+    result = vectorize(rag, jsonl(2), store)
+
+    assert (result.failed, result.vectorized) == (0, 0)
+    assert rag.vector_manager.events == []
+    assert store.chunks.list_for_card(CARD_KEY) == []
+
+
 # --- vector replacement ------------------------------------------------------
 
 def test_a_successful_run_replaces_rather_than_accumulates(jsonl, store):
@@ -236,8 +321,20 @@ def test_fresh_summaries_are_cached_for_next_time(jsonl, store):
 
     vectorize(rag, jsonl(2), store)
 
-    assert store.summaries.get("hash-0", MODEL, _PROMPT_VER) == "摘要 0.png"
+    cached = ImageSummary.model_validate_json(store.summaries.get("hash-0", MODEL, _PROMPT_VER))
+    assert cached == summary(("其他", "內容 0.png"))
     assert store.summaries.stats()["entries"] == 2
+
+
+def test_a_cache_entry_that_no_longer_parses_is_a_miss(jsonl, store):
+    """Otherwise one bad row would fail that card on every crawl from then on."""
+    store.summaries.put("hash-0", MODEL, _PROMPT_VER, "not json")
+    rag = build_rag(StubLLM())
+
+    result = vectorize(rag, jsonl(1), store)
+
+    assert rag.llm.seen == ["0.png"]
+    assert (result.cached, result.summarized, result.vectorized) == (0, 1, 1)
 
 
 def test_a_second_run_reuses_what_the_first_one_stored(jsonl, store):
@@ -254,7 +351,9 @@ def test_a_second_run_reuses_what_the_first_one_stored(jsonl, store):
 
 def test_a_different_model_does_not_reuse_the_old_summaries(jsonl, store):
     """Switching provider must not serve summaries the new model never wrote."""
-    store.summaries.put("hash-0", "some-other-model", _PROMPT_VER, "別的模型的摘要")
+    store.summaries.put(
+        "hash-0", "some-other-model", _PROMPT_VER, summary(("其他", "別的模型的內容")).model_dump_json()
+    )
     rag = build_rag(StubLLM())
 
     result = vectorize(rag, jsonl(1), store)

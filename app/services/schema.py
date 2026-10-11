@@ -1,4 +1,18 @@
+from typing import Literal
 from pydantic import BaseModel
+
+class SummarySection(BaseModel):
+    """
+    One independent offer, plan or clause transcribed from an image
+    """
+    section: Literal["產品特色", "回饋", "優惠活動", "年費", "申請資格", "注意事項", "其他"]
+    content: str
+
+class ImageSummary(BaseModel):
+    """
+    What the vision model returns for one image.
+    """
+    sections: list[SummarySection]
 
 class VectorDatabaseData(BaseModel):
     """
@@ -7,7 +21,8 @@ class VectorDatabaseData(BaseModel):
     text: str
     vector: list[float]
     url: str
-    card_id: str
+    section: str
+    card_key: str
     card_name: str
     bank_code: str
 
@@ -17,7 +32,8 @@ class SourceData(BaseModel):
     """
     text: str
     url: str
-    card_id: str
+    section: str
+    card_key: str
     card_name: str
     bank_code: str
 
@@ -32,7 +48,7 @@ class CardInfo(BaseModel):
     """
     Card information in the vector database
     """
-    card_id: str
+    card_key: str
     card_name: str
     bank_code: str
 
@@ -47,4 +63,4 @@ class VectorizeResult(BaseModel):
     cached: int       # summaries reused, costing no model call
     summarized: int   # summaries newly generated
     failed: int       # images given up on after retries
-    vectorized: int   # records written to Milvus (cached + summarized)
+    vectorized: int   # records written to Milvus — one per section
