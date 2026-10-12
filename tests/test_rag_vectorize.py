@@ -16,10 +16,13 @@ import json
 import pytest
 
 from app.services.rag import _PROMPT_VER, RAG
-from app.services.schema import ImageSummary, SummarySection
-from app.services.store import Store
+from app.services.schema import CardFacts, ImageSummary, SummarySection
+from app.services.store import Card, Store
 
-CARD_KEY = "0f5a1c9de4b27a3f8c6d0e1b2a394857c6d0e1b2"
+BANK = "taishin"
+CARD_NAME = "測試卡"
+CARD_URL = "https://bank.test/card"
+CARD_KEY = Card.make_key(BANK, CARD_URL)
 MODEL = "stub-vision-model"
 
 
@@ -31,12 +34,19 @@ def summary(*sections: tuple[str, str]) -> ImageSummary:
     return ImageSummary(sections=[SummarySection(section=s, content=c) for s, c in sections])
 
 
+def facts(**known: str) -> CardFacts:
+    return CardFacts(**{name: known.get(name, "未載明") for name in CardFacts.model_fields})
+
+
 class StubLLM:
     """
     Transcribes images, one section each unless `sections_for` says otherwise.
     `fail` reproduces a provider outage; `fail_for` singles out one image, which
     is how a partial failure gets exercised; `unparseable_for` reproduces a reply
     the provider could not parse, which arrives as None rather than as an error.
+
+    Also answers the text-only call that extracts a card's facts; `fail_facts`
+    makes that call fail while the images still succeed.
     """
 
     model_config = StubModelConfig()
@@ -47,14 +57,23 @@ class StubLLM:
         fail_for: set[str] | None = None,
         unparseable_for: set[str] | None = None,
         sections_for: dict[str, list[tuple[str, str]]] | None = None,
+        fail_facts: bool = False,
     ):
         self.fail = fail
         self.fail_for = fail_for or set()
         self.unparseable_for = unparseable_for or set()
         self.sections_for = sections_for or {}
+        self.fail_facts = fail_facts
         self.seen: list[str] = []
+        self.facts_prompts: list[str] = []
 
     async def chat(self, prompt, images=None, structured_schema=None):
+        if structured_schema is CardFacts:
+            self.facts_prompts.append(prompt)
+            if self.fail_facts:
+                raise RuntimeError("HTTP/1.1 500 Internal Server Error")
+            return facts(annual_fee=f"第 {len(self.facts_prompts)} 次抽取")
+
         image = images[0]
         self.seen.append(image)
         if self.fail or image in self.fail_for:
@@ -88,6 +107,7 @@ class StubVectorManager:
 def store():
     s = Store(":memory:")
     s.create_all()
+    s.cards.upsert(BANK, CARD_NAME, CARD_URL)  # facts are written to the card's row
     yield s
     s.close()
 
@@ -128,7 +148,7 @@ def build_rag(llm: StubLLM) -> RAG:
 
 def vectorize(rag: RAG, path, store: Store):
     return asyncio.run(
-        rag.analyze_images_to_vecdb(path, CARD_KEY, "測試卡", "taishin", store)
+        rag.analyze_images_to_vecdb(path, CARD_KEY, CARD_NAME, BANK, store)
     )
 
 
@@ -267,6 +287,97 @@ def test_a_card_with_no_content_at_all_leaves_the_existing_vectors_alone(jsonl, 
     assert (result.failed, result.vectorized) == (0, 0)
     assert rag.vector_manager.events == []
     assert store.chunks.list_for_card(CARD_KEY) == []
+
+
+# --- card facts --------------------------------------------------------------
+
+def test_a_successful_run_stores_the_cards_facts(jsonl, store):
+    rag = build_rag(StubLLM())
+
+    result = vectorize(rag, jsonl(2), store)
+
+    assert result.facts_extracted
+    assert CardFacts.model_validate(store.cards.get(CARD_KEY).facts_json) == facts(annual_fee="第 1 次抽取")
+
+
+def test_facts_are_extracted_from_every_section_of_the_card(jsonl, store):
+    """Limits and conditions turn up under any section, so none is left out."""
+    rag = build_rag(StubLLM(sections_for={
+        "0.png": [("年費", "首年免年費")],
+        "1.png": [("注意事項", "每期回饋上限300元")],
+    }))
+
+    vectorize(rag, jsonl(2), store)
+
+    (prompt,) = rag.llm.facts_prompts
+    assert "測試卡｜年費\n首年免年費" in prompt
+    assert "測試卡｜注意事項\n每期回饋上限300元" in prompt
+
+
+def test_facts_that_cannot_be_extracted_abort_the_whole_replacement(jsonl, store):
+    """
+    Vectors without facts would leave the card out of every comparison with
+    nothing to show for it, so the card is not replaced at all.
+    """
+    rag = build_rag(StubLLM(fail_facts=True))
+
+    result = vectorize(rag, jsonl(2), store)
+
+    assert (result.failed, result.vectorized, result.facts_extracted) == (0, 0, False)
+    assert len(rag.llm.facts_prompts) == 4  # the first attempt plus three retries
+    assert rag.vector_manager.events == []
+    assert store.chunks.list_for_card(CARD_KEY) == []
+    assert store.cards.get(CARD_KEY).facts_json is None
+
+
+def test_a_failed_extraction_keeps_the_previous_vectors_and_facts(jsonl, store):
+    """What the card held before stays a matching pair."""
+    vectorize(build_rag(StubLLM()), jsonl(2), store)
+    before = store.cards.get(CARD_KEY).facts_json
+
+    retry = build_rag(StubLLM(fail_facts=True))
+    result = vectorize(retry, jsonl(3), store)  # the card changed, so facts are due again
+
+    assert not result.facts_extracted
+    assert retry.vector_manager.events == []
+    assert store.cards.get(CARD_KEY).facts_json == before
+    assert len(store.chunks.list_for_card(CARD_KEY)) == 2
+
+
+def test_an_unchanged_card_keeps_its_facts_without_asking_the_model(jsonl, store):
+    path = jsonl(3)
+    vectorize(build_rag(StubLLM()), path, store)
+
+    second = build_rag(StubLLM())
+    result = vectorize(second, path, store)
+
+    assert second.llm.facts_prompts == []  # reused, not extracted again
+    assert result.facts_extracted
+    assert store.cards.get(CARD_KEY).facts_json["annual_fee"] == "第 1 次抽取"
+
+
+def test_a_card_that_lost_an_image_has_its_facts_extracted_again(jsonl, store):
+    """Every remaining image is a cache hit, yet the card no longer says the same thing."""
+    vectorize(build_rag(StubLLM()), jsonl(3), store)
+
+    second = build_rag(StubLLM())
+    result = vectorize(second, jsonl(2), store)
+
+    assert second.llm.seen == []
+    assert (len(second.llm.facts_prompts), result.facts_extracted) == (1, True)
+
+
+def test_facts_missing_a_field_are_extracted_again(jsonl, store):
+    """How a newly added fact reaches cards that were crawled before it existed."""
+    path = jsonl(2)
+    vectorize(build_rag(StubLLM()), path, store)
+    store.cards.update_facts(CARD_KEY, {"annual_fee": "舊版只有這一項"})
+
+    second = build_rag(StubLLM())
+    result = vectorize(second, path, store)
+
+    assert len(second.llm.facts_prompts) == 1
+    assert CardFacts.model_validate(store.cards.get(CARD_KEY).facts_json)
 
 
 # --- vector replacement ------------------------------------------------------

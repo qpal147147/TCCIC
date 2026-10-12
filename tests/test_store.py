@@ -104,11 +104,13 @@ def test_clear_crawl_state_returns_a_card_to_unindexed(store, card_key):
     starts: still in the catalog, still on sale, simply not indexed.
     """
     store.cards.mark_crawled(card_key, content_changed=True)
+    store.cards.update_facts(card_key, {"annual_fee": "首年免年費"})
 
     cleared = store.cards.clear_crawl_state(card_key)
 
     assert cleared.last_crawled_at is None
     assert cleared.last_changed_at is None
+    assert cleared.facts_json is None  # facts describe content the card no longer holds
     assert cleared.status == "active"  # deleting an index says nothing about the bank
 
 

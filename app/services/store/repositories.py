@@ -149,6 +149,7 @@ class CardRepository(_BaseRepository):
                 return None
             card.last_crawled_at = None
             card.last_changed_at = None
+            card.facts_json = None
             session.commit()
             return card
 

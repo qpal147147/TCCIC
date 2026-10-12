@@ -7,6 +7,7 @@ session keeps one code path instead of two. Blocking the event loop for that
 long inside an async endpoint is not measurable next to an LLM call.
 """
 
+import json
 import logging
 from pathlib import Path
 
@@ -72,6 +73,11 @@ def _apply_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
     cursor.close()
 
 
+def _dump_json(value) -> str:
+    """Write JSON columns as readable text; the default escapes Chinese to \\uXXXX."""
+    return json.dumps(value, ensure_ascii=False)
+
+
 def create_db_engine(db_path: str) -> Engine:
     """Build an SQLite engine configured for multi-threaded access."""
     if db_path == ":memory:":
@@ -81,6 +87,7 @@ def create_db_engine(db_path: str) -> Engine:
             "sqlite:///:memory:",
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
+            json_serializer=_dump_json,
         )
     else:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -89,6 +96,7 @@ def create_db_engine(db_path: str) -> Engine:
             # Connections are handed between threads by the pool; SQLite is safe
             # here because the pool guarantees one user at a time.
             connect_args={"check_same_thread": False},
+            json_serializer=_dump_json,
         )
 
     event.listen(engine, "connect", _apply_sqlite_pragmas)

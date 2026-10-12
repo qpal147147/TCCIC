@@ -11,7 +11,7 @@ from app.services.llm_factory import LLMFactory
 from app.services.milvus import MilvusManager
 from pydantic import ValidationError
 
-from app.services.schema import VectorDatabaseData, LLMResponse, CardInfo, VectorizeResult, ImageSummary
+from app.services.schema import VectorDatabaseData, LLMResponse, CardInfo, VectorizeResult, ImageSummary, CardFacts
 from app.services.store import ChunkInput, Store
 from app.configs.global_settings import global_settings
 
@@ -60,6 +60,22 @@ _PROMPT_VER = hashlib.sha256(
     (_SUMMARY_PROMPT + json.dumps(ImageSummary.model_json_schema(), sort_keys=True)).encode("utf-8")
 ).hexdigest()[:12]
 
+_FACTS_PROMPT = """
+以下是同一張台灣信用卡官方頁面的內容，每段開頭標示「卡片名稱｜分類」。請根據這些內容，為這張卡填寫下列每一項事實。
+
+填寫規則：
+1. 每一項用一句話回答，80字以內。
+2. 數字、百分比、金額、日期、通路與商店名稱，必須與內容中的寫法完全一致，不得改寫、換算或推測。
+3. 同一項有多個卡等或多種情況時，在同一句內分別列出。
+4. 回饋率必須連同它的條件一起寫（適用通路、門檻、上限），不得只寫數字。
+5. 內容沒有提到的項目，填「未載明」。
+
+要填寫的事實：
+{facts}
+""".strip().format(
+    facts="\n".join(f"- {field.description}" for field in CardFacts.model_fields.values())
+)
+
 
 class RAG():
     def __init__(
@@ -104,6 +120,44 @@ class RAG():
             logger.warning("Ignoring a cached summary that could not be parsed.")
             return None
 
+    async def _extract_facts(
+        self, texts: list[str], timeout: float, retry_count: int
+    ) -> CardFacts | None:
+        """
+        Condense a card's sections into its facts with one text-only call.
+        Returns None once the retries are spent.
+        """
+        prompt = f"{_FACTS_PROMPT}\n\n內容：\n\n" + "\n\n".join(texts)
+        for attempt in range(retry_count + 1):
+            try:
+                response = await asyncio.wait_for(
+                    self.llm.chat(prompt, None, CardFacts), timeout=timeout
+                )
+                if isinstance(response, CardFacts):
+                    return response
+                error = "the model's reply could not be parsed into facts"
+            except Exception as e:
+                error = e
+            logger.warning(f"Fact extraction attempt {attempt + 1}/{retry_count + 1} failed: {error}")
+        return None
+
+    @staticmethod
+    def _facts_still_hold(store: Store, card_key: str, hashes: list[str]) -> bool:
+        """
+        True when the facts on file were made from exactly this content and still
+        fit CardFacts — a card that gained a fact field since is extracted again.
+        """
+        card = store.cards.get(card_key)
+        if card is None or not card.facts_json:
+            return False
+        if [chunk.content_hash for chunk in store.chunks.list_for_card(card_key)] != hashes:
+            return False
+        try:
+            CardFacts.model_validate(card.facts_json)
+        except ValidationError:
+            return False
+        return True
+
     async def analyze_images_to_vecdb(
         self,
         feature_jsonl_path: str | Path,
@@ -125,6 +179,10 @@ class RAG():
         If any image fails to summarize, the card keeps the vectors it already
         had and `vectorized` comes back 0. Summaries that did succeed are
         still cached, so a retry only pays for the images that failed.
+
+        The card's facts are extracted from the same sections and are part of
+        the same all-or-nothing: if they cannot be extracted nothing is written,
+        so a card's vectors and its facts always come from the same crawl.
         """
         with open(feature_jsonl_path, "r", encoding="utf-8") as f:
             rows = [json.loads(line) for line in f if line.strip()]
@@ -140,6 +198,7 @@ class RAG():
             for row in rows
         ]
 
+        # step1: load summary cache from database
         for entry in entries:
             entry["summary"] = self._load_cached(
                 store.summaries.get(entry["hash"], model_name, _PROMPT_VER)
@@ -152,6 +211,7 @@ class RAG():
             f"{cached} reused from cache, {len(pending)} to summarize (batch_size={self._llm_batch_size})."
         )
 
+        # step2: for images without summary cached, call the LLM to analyze them (with retry on error).
         failed = 0
         for i in range(0, len(pending), self._llm_batch_size):
             batch = pending[i:i + self._llm_batch_size]
@@ -188,7 +248,7 @@ class RAG():
                 logger.info(f"Rate-limit pause: sleeping {self._rate_limit_sleep_s}s before next batch.")
                 await asyncio.sleep(self._rate_limit_sleep_s)
 
-        # Original JSONL order, so chunk order matches what was inserted.
+        # step3: if any data failed, abort the task immediately and log the error.
         ready = [e for e in entries if e["summary"] is not None]
         summarized = len(ready) - cached
         logger.info(f"Summarization complete: {cached} cached, {summarized} generated, {failed} failed.")
@@ -199,6 +259,7 @@ class RAG():
                 images=len(entries), cached=cached, summarized=summarized, failed=failed, vectorized=0
             )
 
+        # step4: repackage analyzed data as input for the embedding stage.
         records = [
             (entry, section.section, f"{card_name}｜{section.section}\n{section.content.strip()}")
             for entry in ready
@@ -212,8 +273,21 @@ class RAG():
                 images=len(entries), cached=cached, summarized=summarized, failed=0, vectorized=0
             )
 
-        logger.info(f"Embedding {len(records)} sections from {len(ready)} images ")
+        # step5: generate a basic fact of all analyzed chunks for this card and store it in the DB.
         texts = [text for _, _, text in records]
+        hashes = [entry["hash"] for entry in ready]
+
+        facts: CardFacts | None = None
+        if summarized == 0 and self._facts_still_hold(store, card_key, hashes):
+            logger.info(f"Content of '{card_name}' is unchanged: keeping its existing facts.")
+        else:
+            facts = await self._extract_facts(texts, model_timeout, retry_count)
+            if facts is None:
+                logger.warning(f"Aborting vectorization of '{card_name}': its facts could not be extracted.")
+                return VectorizeResult(images=len(entries), cached=cached, summarized=summarized, failed=0, vectorized=0, facts_extracted=False)
+
+        # setp6: embed all summaries and save them with metadata to the vector DB.
+        logger.info(f"Embedding {len(records)} sections from {len(ready)} images ")
         if embedding_batch_size:
             embedding_texts = []
             for j in range(0, len(texts), embedding_batch_size):
@@ -245,13 +319,17 @@ class RAG():
             ChunkInput(seq=seq, page_url=entry["url"], content_hash=entry["hash"])
             for seq, entry in enumerate(ready)
         ])
+        if facts is not None:
+            store.cards.update_facts(card_key, facts.model_dump())
 
+        # step7: return data
         return VectorizeResult(
             images=len(entries),
             cached=cached,
             summarized=summarized,
             failed=failed,
             vectorized=len(items),
+            facts_extracted=True,
         )
 
 
