@@ -94,13 +94,25 @@ class CardRepository(_BaseRepository):
         with self._session_factory() as session:
             return session.scalar(select(Card).where(Card.card_url == card_url))
 
-    def list(self, bank_code: Optional[str] = None, status: Optional[str] = "active") -> list[Card]:
+    def get_list(self, bank_code: Optional[str] = None, status: Optional[str] = "active") -> list[Card]:
         """List cards, by default only those still on sale."""
         stmt = select(Card)
         if bank_code:
             stmt = stmt.where(Card.bank_code == bank_code)
         if status:
             stmt = stmt.where(Card.status == _require(status, _CARD_STATUSES))
+        stmt = stmt.order_by(Card.bank_code, Card.card_name)
+        with self._session_factory() as session:
+            return list(session.scalars(stmt))
+
+    def list_with_facts(self, bank_code: Optional[str] = None) -> list[Card]:
+        """
+        Cards on sale that have facts — everything a cross-card comparison reads.
+        Ordered so the same question sees the cards in the same order every time.
+        """
+        stmt = select(Card).where(Card.facts_json.is_not(None), Card.status == "active")
+        if bank_code:
+            stmt = stmt.where(Card.bank_code == bank_code)
         stmt = stmt.order_by(Card.bank_code, Card.card_name)
         with self._session_factory() as session:
             return list(session.scalars(stmt))

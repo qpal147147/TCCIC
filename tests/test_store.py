@@ -114,6 +114,28 @@ def test_clear_crawl_state_returns_a_card_to_unindexed(store, card_key):
     assert cleared.status == "active"  # deleting an index says nothing about the bank
 
 
+def test_only_cards_with_facts_on_sale_are_compared(store, card_key):
+    """
+    Checked through the query, not the attribute: a cleared value stored as the
+    JSON text 'null' reads back as None yet still matches `IS NOT NULL`.
+    """
+    def add(bank, name, with_facts=True):
+        key = store.cards.upsert(bank, name, f"https://bank.test/{bank}/{name}").card_key
+        if with_facts:
+            store.cards.update_facts(key, {"annual_fee": "首年免年費"})
+        return key
+
+    add("taishin", "有事實")
+    add("taishin", "尚未爬取", with_facts=False)
+    cleared = add("taishin", "已刪除")
+    store.cards.clear_crawl_state(cleared)
+    store.cards.set_status(add("taishin", "已下架"), "delisted")
+    add("dbs", "他行")
+
+    assert [c.card_name for c in store.cards.list_with_facts()] == ["他行", "有事實"]
+    assert [c.card_name for c in store.cards.list_with_facts("taishin")] == ["有事實"]
+
+
 def test_crawl_state_recovers_without_manual_reset(store, card_key):
     """The next successful crawl restores the timestamps on its own."""
     store.cards.clear_crawl_state(card_key)

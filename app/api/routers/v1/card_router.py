@@ -70,10 +70,12 @@ async def delete_card(request: Request, card_key: str):
 @router.post("/qa")
 async def card_qa(request: Request, qa_request : QARequest):
     rag: RAG = request.state.rag
+    store: Store = request.state.store
 
     try:
         result = await rag.chat(
             query=qa_request.question,
+            store=store,
             card_key=qa_request.card_key,
             bank_code=qa_request.bank_code,
         )

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 class SummarySection(BaseModel):
@@ -33,6 +33,26 @@ class CardFacts(BaseModel):
     travel_benefits: str = Field(description="旅遊權益：機場貴賓室、機場接送、旅遊平安險等")
     eligibility: str = Field(description="申請資格：年齡與財力門檻")
 
+class QueryRoute(BaseModel):
+    """
+    The query route an LLM returns after analyzing the user's question.`route` picks the data source:
+
+    `vector` searches the card sections,
+    `sql` reads the named `facts` from every card.
+    """
+    route: Literal["vector", "sql"]
+    facts: list[Literal[tuple(CardFacts.model_fields)]] = Field(default_factory=list, max_length=3)
+
+class CompareAnswer(BaseModel):
+    """
+    The response format the LLM returns on the SQL route.
+
+    `answer`: the synthesized answer.
+    `cited`: the referenced sources, numbered from 1.
+    """
+    answer: str
+    cited: list[int] = Field(default_factory=list)
+
 class VectorDatabaseData(BaseModel):
     """
     Data that needs to be stored in the vector database
@@ -47,11 +67,12 @@ class VectorDatabaseData(BaseModel):
 
 class SourceData(BaseModel):
     """
-    Raw data retrieved from vector data
+    What an answer was based on: a section from the vector store, or a card's
+    facts from the `sql` route — which have no section.
     """
     text: str
     url: str
-    section: str
+    section: Optional[str] = None
     card_key: str
     card_name: str
     bank_code: str
@@ -61,6 +82,7 @@ class LLMResponse(BaseModel):
     Data returned by calling the "Chat" method
     """
     response: str
+    route: Literal["vector", "sql"]
     sources: list[SourceData]
 
 class CardInfo(BaseModel):

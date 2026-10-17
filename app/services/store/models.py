@@ -90,8 +90,7 @@ class Card(Base):
     bank_code: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     card_name: Mapped[str] = mapped_column(String(128), nullable=False)
     card_url: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
-
-    facts_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    facts_json: Mapped[Optional[dict]] = mapped_column(JSON(none_as_null=True), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
 
     first_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
@@ -136,7 +135,7 @@ class CrawlJob(Base):
 
     artifact_dir: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     # e.g. {"images": 15, "llm_calls": 3, "cache_hits": 12} — read by breakage detection
-    stats_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    stats_json: Mapped[Optional[dict]] = mapped_column(JSON(none_as_null=True), nullable=True)
 
     callback_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     callback_status: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
