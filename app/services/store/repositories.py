@@ -23,6 +23,7 @@ from app.services.store.models import (
     CardChunk,
     CardStatus,
     CrawlJob,
+    JobCallback,
     JobStatus,
     JobType,
     SummaryCache,
@@ -188,7 +189,6 @@ class JobRepository(_BaseRepository):
         target_url: str,
         card_key: Optional[str] = None,
         batch_id: Optional[str] = None,
-        callback_url: Optional[str] = None,
     ) -> CrawlJob:
         _require(job_type, _JOB_TYPES)
         with self._session_factory() as session:
@@ -199,8 +199,6 @@ class JobRepository(_BaseRepository):
                 target_url=target_url,
                 card_key=card_key,
                 batch_id=batch_id,
-                callback_url=callback_url,
-                callback_status="pending" if callback_url else None,
                 status="queued",
                 created_at=utcnow(),
             )
@@ -325,15 +323,61 @@ class JobRepository(_BaseRepository):
         with self._session_factory() as session:
             return list(session.scalars(stmt))
 
-    def set_callback_status(self, job_id: str, status: str) -> Optional[CrawlJob]:
+
+class CallbackRepository(_BaseRepository):
+    """
+    Callback subscriptions: who asked to be told when a job finishes.
+
+    A job may have any number of them, each delivered once on its own.
+    """
+
+    def subscribe(self, job_id: str, callback_url: str) -> JobCallback:
+        with self._session_factory() as session:
+            callback = JobCallback(
+                job_id=job_id,
+                callback_url=callback_url,
+                status="pending",
+                created_at=utcnow(),
+            )
+            session.add(callback)
+            session.commit()
+            return callback
+
+    def pending_for_job(self, job_id: str) -> list[JobCallback]:
+        stmt = (
+            select(JobCallback)
+            .where(JobCallback.job_id == job_id, JobCallback.status == "pending")
+            .order_by(JobCallback.id)
+        )
+        with self._session_factory() as session:
+            return list(session.scalars(stmt))
+
+    def pending_for_finished_jobs(self) -> list[JobCallback]:
+        """
+        Subscriptions still owed a delivery although their job has ended — left
+        behind by a restart. A job still in flight is not finished, so its
+        subscriptions wait for it instead.
+        """
+        stmt = (
+            select(JobCallback)
+            .join(CrawlJob, CrawlJob.job_id == JobCallback.job_id)
+            .where(JobCallback.status == "pending", CrawlJob.status.not_in(ACTIVE_JOB_STATUSES))
+            .order_by(JobCallback.id)
+        )
+        with self._session_factory() as session:
+            return list(session.scalars(stmt))
+
+    def mark(self, callback_id: int, status: str) -> Optional[JobCallback]:
         _require(status, _CALLBACK_STATUSES)
         with self._session_factory() as session:
-            job = session.get(CrawlJob, job_id)
-            if job is None:
+            callback = session.get(JobCallback, callback_id)
+            if callback is None:
                 return None
-            job.callback_status = status
+            callback.status = status
+            if status == "delivered":
+                callback.delivered_at = utcnow()
             session.commit()
-            return job
+            return callback
 
 
 class ChunkRepository(_BaseRepository):

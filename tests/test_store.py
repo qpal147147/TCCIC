@@ -42,7 +42,7 @@ def test_upsert_is_idempotent(store):
     second = store.cards.upsert(BANK, CARD_NAME, CARD_URL)
 
     assert first.card_key == second.card_key
-    assert len(store.cards.list()) == 1
+    assert len(store.cards.get_list()) == 1
     assert first.first_seen_at == second.first_seen_at
 
 
@@ -51,7 +51,7 @@ def test_upsert_follows_a_rename(store):
     renamed = store.cards.upsert(BANK, "Richart 玫瑰悠遊卡", CARD_URL)
 
     assert renamed.card_name == "Richart 玫瑰悠遊卡"
-    assert len(store.cards.list()) == 1
+    assert len(store.cards.get_list()) == 1
 
 
 def test_get_by_url_and_bank_filter(store, card_key):
@@ -59,15 +59,15 @@ def test_get_by_url_and_bank_filter(store, card_key):
 
     assert store.cards.get_by_url(CARD_URL).card_key == card_key
     assert store.cards.get(card_key).bank_code == BANK
-    assert len(store.cards.list()) == 2
-    assert len(store.cards.list(bank_code=BANK)) == 1
+    assert len(store.cards.get_list()) == 2
+    assert len(store.cards.get_list(bank_code=BANK)) == 1
 
 
 def test_delisted_cards_are_hidden_but_kept(store, card_key):
     store.cards.set_status(card_key, "delisted")
 
-    assert store.cards.list() == []
-    assert len(store.cards.list(status="delisted")) == 1
+    assert store.cards.get_list() == []
+    assert len(store.cards.get_list(status="delisted")) == 1
     assert store.cards.get(card_key) is not None
 
 
@@ -246,15 +246,51 @@ def test_batch_jobs_stay_grouped(store):
     assert len(store.jobs.list_by_batch("batch-1")) == 3
 
 
-def test_callback_status_defaults_to_pending_only_when_requested(store):
-    with_cb = store.jobs.create("job-1", "card_list", BANK, CARD_URL, callback_url="https://x.test/hook")
-    without_cb = store.jobs.create("job-2", "card_list", BANK, CARD_URL)
+# --- callbacks ---------------------------------------------------------------
 
-    assert with_cb.callback_status == "pending"
-    assert without_cb.callback_status is None
+def test_a_job_can_have_several_subscriptions(store):
+    store.jobs.create("job-1", "card_list", BANK, CARD_URL)
+    a = store.callbacks.subscribe("job-1", "https://a.test/hook")
+    b = store.callbacks.subscribe("job-1", "https://b.test/hook")
 
-    store.jobs.set_callback_status("job-1", "delivered")
-    assert store.jobs.get("job-1").callback_status == "delivered"
+    assert [c.id for c in store.callbacks.pending_for_job("job-1")] == [a.id, b.id]
+
+    store.callbacks.mark(a.id, "delivered")
+
+    assert [c.id for c in store.callbacks.pending_for_job("job-1")] == [b.id]
+
+
+def test_delivery_is_timestamped_and_failure_is_not(store):
+    store.jobs.create("job-1", "card_list", BANK, CARD_URL)
+    ok = store.callbacks.subscribe("job-1", "https://a.test/hook")
+    bad = store.callbacks.subscribe("job-1", "https://b.test/hook")
+
+    assert store.callbacks.mark(ok.id, "delivered").delivered_at is not None
+    assert store.callbacks.mark(bad.id, "failed").delivered_at is None
+
+
+def test_invalid_callback_status_is_rejected(store):
+    store.jobs.create("job-1", "card_list", BANK, CARD_URL)
+    callback = store.callbacks.subscribe("job-1", "https://a.test/hook")
+
+    with pytest.raises(ValueError):
+        store.callbacks.mark(callback.id, "sent")
+
+
+def test_only_finished_jobs_have_callbacks_to_redeliver(store):
+    """A job still in flight sends its callbacks when it ends, not at startup."""
+    for job_id in ("queued", "running", "done", "failed"):
+        store.jobs.create(job_id, "card_list", BANK, CARD_URL)
+        store.callbacks.subscribe(job_id, f"https://hooks.test/{job_id}")
+    store.jobs.mark_running("running")
+    store.jobs.mark_completed("done")
+    store.jobs.mark_failed("failed", "boom")
+    delivered = store.callbacks.subscribe("done", "https://hooks.test/already")
+    store.callbacks.mark(delivered.id, "delivered")
+
+    pending = store.callbacks.pending_for_finished_jobs()
+
+    assert sorted(c.job_id for c in pending) == ["done", "failed"]
 
 
 # --- card composition --------------------------------------------------------
@@ -396,6 +432,6 @@ def test_startup_upgrade_preserves_existing_data(tmp_path):
 
     store = Store(str(db))
     try:
-        assert len(store.cards.list()) == 1
+        assert len(store.cards.get_list()) == 1
     finally:
         store.close()

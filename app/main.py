@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 from app.api.routers.v1.api import router as v1_router
 from app.api.routers.v1.crawler_router import run_card_feature_spider, run_card_list_spider
 from app.utils.logger_setup import setup_app_logger
+from app.services.callback import CallbackNotifier
 from app.services.rag import RAG
 from app.services.store import Store, upgrade_schema
 from app.configs.global_settings import global_settings
@@ -32,6 +33,19 @@ async def lifespan(app: FastAPI):
     if orphaned:
         logger.warning(f"Reconciled {orphaned} job(s) left unfinished by a previous run.")
 
+    notifier = CallbackNotifier(
+        store,
+        global_settings.AUTH_KEY.get_secret_value(),
+        allow_private=global_settings.CALLBACK_ALLOW_PRIVATE,
+        timeout_s=global_settings.CALLBACK_TIMEOUT_S,
+        retry_delays_s=global_settings.CALLBACK_RETRY_DELAYS_S,
+        max_workers=global_settings.CALLBACK_MAX_WORKERS,
+    )
+    # Covers both the jobs just reconciled and callbacks a previous run never sent.
+    redelivered = notifier.redeliver_pending()
+    if redelivered:
+        logger.info(f"Redelivering {redelivered} callback(s) left pending by a previous run.")
+
     feature_queue: asyncio.Queue = asyncio.Queue(maxsize=global_settings.CRAWL_QUEUE_MAX_SIZE)
     list_queue: asyncio.Queue = asyncio.Queue(maxsize=global_settings.CRAWL_QUEUE_MAX_SIZE)
 
@@ -39,7 +53,7 @@ async def lifespan(app: FastAPI):
         while True:
             spider_data = await feature_queue.get()
             try:
-                await asyncio.to_thread(run_card_feature_spider, spider_data, store)
+                await asyncio.to_thread(run_card_feature_spider, spider_data, store, notifier)
             except Exception as e:
                 logger.error(f"Feature worker error: {e}")
             finally:
@@ -49,7 +63,7 @@ async def lifespan(app: FastAPI):
         while True:
             spider_data = await list_queue.get()
             try:
-                await asyncio.to_thread(run_card_list_spider, spider_data, store)
+                await asyncio.to_thread(run_card_list_spider, spider_data, store, notifier)
             except Exception as e:
                 logger.error(f"List worker error: {e}")
             finally:
@@ -63,6 +77,7 @@ async def lifespan(app: FastAPI):
     yield {
         "rag": rag,
         "store": store,
+        "notifier": notifier,
         "feature_queue": feature_queue,
         "list_queue": list_queue,
     }
@@ -71,6 +86,7 @@ async def lifespan(app: FastAPI):
     for w in workers:
         w.cancel()
     await asyncio.gather(*workers, return_exceptions=True)
+    notifier.shutdown()
     rag.close()
     store.close()
     logger.info("FastAPI is down")

@@ -137,9 +137,6 @@ class CrawlJob(Base):
     # e.g. {"images": 15, "llm_calls": 3, "cache_hits": 12} — read by breakage detection
     stats_json: Mapped[Optional[dict]] = mapped_column(JSON(none_as_null=True), nullable=True)
 
-    callback_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
-    callback_status: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
-
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     started_at: Mapped[Optional[datetime]] = mapped_column(UtcDateTime, nullable=True)
     finished_at: Mapped[Optional[datetime]] = mapped_column(UtcDateTime, nullable=True)
@@ -221,3 +218,30 @@ class SummaryCache(Base):
 
     def __repr__(self) -> str:
         return f"<SummaryCache {self.content_hash[:8]} {self.model_name} hits={self.hit_count}>"
+
+
+class JobCallback(Base):
+    """
+    One request to be told when a job finishes.
+
+    A job can have several: a duplicate submission of a card already in flight
+    is answered with the existing job, and its callback URL subscribes to that
+    job rather than being dropped. De-duplicating is the caller's business.
+
+    Each subscription is delivered once, independently of the others, and stays
+    `pending` until then — so one left undelivered by a restart is picked up
+    again at the next startup.
+    """
+
+    __tablename__ = "job_callbacks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    callback_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(UtcDateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<JobCallback {self.id} {self.job_id[:8]} {self.status}>"

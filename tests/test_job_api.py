@@ -51,13 +51,29 @@ def rag():
     return StubRAG()
 
 
+class StubNotifier:
+    """Records which jobs were asked to send their callbacks; delivery is tested in test_callback.py."""
+
+    def __init__(self):
+        self.notified: list[str] = []
+
+    def notify(self, job_id: str):
+        self.notified.append(job_id)
+
+
 @pytest.fixture
-def client(store, rag):
+def notifier():
+    return StubNotifier()
+
+
+@pytest.fixture
+def client(store, rag, notifier):
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         yield {
             "store": store,
             "rag": rag,
+            "notifier": notifier,
             "feature_queue": asyncio.Queue(maxsize=QUEUE_SIZE),
             "list_queue": asyncio.Queue(maxsize=QUEUE_SIZE),
         }
@@ -117,7 +133,7 @@ def test_recrawling_reuses_the_catalog_entry(client, store):
 
     assert second["job_id"] != first["job_id"]
     assert second["card_key"] == first["card_key"]
-    assert len(store.cards.list()) == 1
+    assert len(store.cards.get_list()) == 1
 
 
 def test_batch_submission_shares_a_batch_id(client, store):
@@ -158,6 +174,68 @@ def test_full_queue_returns_503_and_fails_the_job(client, store):
 def test_invalid_bank_code_is_rejected(client):
     r = client.post("/api/v1/crawler/card-list", json={"bank_code": "../etc", "url": LIST_URL})
     assert r.status_code == 422
+
+
+# --- callbacks ---------------------------------------------------------------
+
+HOOK = "https://hooks.example.com/tccic"
+
+
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1/hook",
+    "http://10.0.0.5/hook",
+    "http://169.254.169.254/latest/meta-data",
+    "http://localhost:8000/hook",
+    "file:///etc/passwd",
+])
+def test_a_callback_into_a_private_network_is_rejected(client, store, url):
+    r = client.post("/api/v1/crawler/card-list", json={"bank_code": BANK, "url": LIST_URL, "callback_url": url})
+
+    assert r.status_code == 422
+    with store.session_factory() as session:
+        assert session.scalars(select(CrawlJob)).all() == []  # rejected before any job exists
+
+
+def test_a_callback_url_subscribes_to_the_new_job(client, store):
+    r = client.post("/api/v1/crawler/card-list", json={"bank_code": BANK, "url": LIST_URL, "callback_url": HOOK})
+    job_id = r.json()["data"]["job_id"]
+
+    assert [c.callback_url for c in store.callbacks.pending_for_job(job_id)] == [HOOK]
+
+
+def test_without_a_callback_url_nothing_is_subscribed(client, store):
+    job_id = submit_card_list(client)
+
+    assert store.callbacks.pending_for_job(job_id) == []
+
+
+def test_a_duplicate_submission_adds_a_second_subscription(client, store, notifier):
+    """De-duplicating is the caller's business: both submitters are told."""
+    body = {"bank_code": BANK, "card_name": CARD_NAME, "card_url": CARD_URL}
+    first = client.post("/api/v1/crawler/card-feature", json={**body, "callback_url": HOOK}).json()["data"]
+    second = client.post(
+        "/api/v1/crawler/card-feature", json={**body, "callback_url": f"{HOOK}/other"}
+    )
+
+    assert second.status_code == 200
+    assert second.json()["data"]["job_id"] == first["job_id"]
+    urls = [c.callback_url for c in store.callbacks.pending_for_job(first["job_id"])]
+    assert urls == [HOOK, f"{HOOK}/other"]
+    # Asked to send in case the job finished in between; a no-op while it runs.
+    assert notifier.notified == [first["job_id"]]
+
+
+def test_a_job_rejected_by_a_full_queue_still_notifies(client, store, notifier):
+    """Every finished job notifies, the 503 included — no special case to remember."""
+    for _ in range(QUEUE_SIZE):
+        submit_card_list(client)
+
+    r = client.post("/api/v1/crawler/card-list", json={"bank_code": BANK, "url": LIST_URL, "callback_url": HOOK})
+
+    assert r.status_code == 503
+    with store.session_factory() as session:
+        failed = session.scalars(select(CrawlJob).where(CrawlJob.status == "error")).one()
+    assert notifier.notified == [failed.job_id]
 
 
 def test_api_key_is_required(store):

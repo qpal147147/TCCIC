@@ -15,27 +15,11 @@ from fastapi.responses import JSONResponse
 from app.api.schemas.base_schema import BaseResponse
 from app.api.schemas.job_schema import CardFeatureResult, JobStatusResponse
 from app.crawler.schemas.card_list import BankCardListPageData, CardItem, CardPagesItem
-from app.services.store import CrawlJob, Store
+from app.services.store import Store
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
-def _to_status(job: CrawlJob) -> JobStatusResponse:
-    return JobStatusResponse(
-        job_id=job.job_id,
-        job_type=job.job_type,
-        status=job.status,
-        bank_code=job.bank_code,
-        target_url=job.target_url,
-        card_key=job.card_key,
-        batch_id=job.batch_id,
-        error=job.error,
-        stats=job.stats_json,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-    )
 
 
 def _read_card_list(jsonl_path: Path) -> BankCardListPageData:
@@ -95,7 +79,7 @@ async def job_status(request: Request, job_id: str):
     response = BaseResponse[JobStatusResponse](
         status="success",
         message="Query job status successfully.",
-        data=_to_status(job),
+        data=JobStatusResponse.from_job(job),
     )
     return JSONResponse(content=response.model_dump(mode="json"), status_code=200)
 

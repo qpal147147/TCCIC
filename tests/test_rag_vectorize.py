@@ -15,7 +15,8 @@ import json
 
 import pytest
 
-from app.services.rag import _PROMPT_VER, RAG
+from app.services.prompts import PROMPT_VER
+from app.services.rag import RAG
 from app.services.schema import CardFacts, ImageSummary, SummarySection
 from app.services.store import Card, Store
 
@@ -155,7 +156,7 @@ def vectorize(rag: RAG, path, store: Store):
 def seed_cache(store: Store, *indexes: int):
     for i in indexes:
         store.summaries.put(
-            f"hash-{i}", MODEL, _PROMPT_VER, summary(("其他", f"快取內容 {i}")).model_dump_json()
+            f"hash-{i}", MODEL, PROMPT_VER, summary(("其他", f"快取內容 {i}")).model_dump_json()
         )
 
 
@@ -432,14 +433,14 @@ def test_fresh_summaries_are_cached_for_next_time(jsonl, store):
 
     vectorize(rag, jsonl(2), store)
 
-    cached = ImageSummary.model_validate_json(store.summaries.get("hash-0", MODEL, _PROMPT_VER))
+    cached = ImageSummary.model_validate_json(store.summaries.get("hash-0", MODEL, PROMPT_VER))
     assert cached == summary(("其他", "內容 0.png"))
     assert store.summaries.stats()["entries"] == 2
 
 
 def test_a_cache_entry_that_no_longer_parses_is_a_miss(jsonl, store):
     """Otherwise one bad row would fail that card on every crawl from then on."""
-    store.summaries.put("hash-0", MODEL, _PROMPT_VER, "not json")
+    store.summaries.put("hash-0", MODEL, PROMPT_VER, "not json")
     rag = build_rag(StubLLM())
 
     result = vectorize(rag, jsonl(1), store)
@@ -463,7 +464,7 @@ def test_a_second_run_reuses_what_the_first_one_stored(jsonl, store):
 def test_a_different_model_does_not_reuse_the_old_summaries(jsonl, store):
     """Switching provider must not serve summaries the new model never wrote."""
     store.summaries.put(
-        "hash-0", "some-other-model", _PROMPT_VER, summary(("其他", "別的模型的內容")).model_dump_json()
+        "hash-0", "some-other-model", PROMPT_VER, summary(("其他", "別的模型的內容")).model_dump_json()
     )
     rag = build_rag(StubLLM())
 

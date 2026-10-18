@@ -19,6 +19,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.services.store.models import Base
 from app.services.store.repositories import (
+    CallbackRepository,
     CardRepository,
     ChunkRepository,
     JobRepository,
@@ -129,6 +130,7 @@ class Store:
         self.jobs = JobRepository(self.session_factory)
         self.chunks = ChunkRepository(self.session_factory)
         self.summaries = SummaryCacheRepository(self.session_factory)
+        self.callbacks = CallbackRepository(self.session_factory)
 
         logger.info(f"Metadata store opened at '{db_path}'.")
 

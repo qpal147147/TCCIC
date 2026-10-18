@@ -25,6 +25,23 @@ class JobStatusResponse(BaseModel):
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
 
+    @classmethod
+    def from_job(cls, job) -> "JobStatusResponse":
+        return cls(
+            job_id=job.job_id,
+            job_type=job.job_type,
+            status=job.status,
+            bank_code=job.bank_code,
+            target_url=job.target_url,
+            card_key=job.card_key,
+            batch_id=job.batch_id,
+            error=job.error,
+            stats=job.stats_json,
+            created_at=job.created_at,
+            started_at=job.started_at,
+            finished_at=job.finished_at,
+        )
+
 
 class CardFeatureResult(BaseModel):
     """

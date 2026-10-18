@@ -1,7 +1,10 @@
 import re
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import BaseModel, field_validator
 from pathlib import Path
+
+from app.configs.global_settings import global_settings
+from app.services.callback import check_url_shape
 
 
 def _validate_bank_code(v: str) -> str:
@@ -11,25 +14,47 @@ def _validate_bank_code(v: str) -> str:
     return v
 
 
+def _validate_callback_url(v: Optional[str]) -> Optional[str]:
+    """
+    Shape only — no DNS here, so the request never blocks on a lookup. The host
+    is resolved and checked again right before every delivery attempt.
+    """
+    if v is None:
+        return v
+    return check_url_shape(v, global_settings.CALLBACK_ALLOW_PRIVATE)
+
+
 class CardListRequest(BaseModel):
     bank_code: str
     url: str
+    callback_url: Optional[str] = None
 
     @field_validator('bank_code')
     @classmethod
     def validate_bank_code(cls, v: str) -> str:
         return _validate_bank_code(v)
+
+    @field_validator('callback_url')
+    @classmethod
+    def validate_callback_url(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_callback_url(v)
 
 
 class CardFeatureRequest(BaseModel):
     bank_code: str
     card_name: str
     card_url: str
+    callback_url: Optional[str] = None
 
     @field_validator('bank_code')
     @classmethod
     def validate_bank_code(cls, v: str) -> str:
         return _validate_bank_code(v)
+
+    @field_validator('callback_url')
+    @classmethod
+    def validate_callback_url(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_callback_url(v)
 
     @field_validator('card_url')
     @classmethod

@@ -19,12 +19,14 @@ from app.services.store.models import (
     CardChunk,
     CardStatus,
     CrawlJob,
+    JobCallback,
     JobStatus,
     JobType,
     SummaryCache,
     utcnow,
 )
 from app.services.store.repositories import (
+    CallbackRepository,
     CardRepository,
     ChunkInput,
     ChunkRepository,
@@ -41,6 +43,7 @@ __all__ = [
     "CrawlJob",
     "CardChunk",
     "SummaryCache",
+    "JobCallback",
     "JobType",
     "JobStatus",
     "CardStatus",
@@ -50,5 +53,6 @@ __all__ = [
     "JobRepository",
     "ChunkRepository",
     "SummaryCacheRepository",
+    "CallbackRepository",
     "ChunkInput",
 ]

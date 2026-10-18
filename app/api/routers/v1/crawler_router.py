@@ -29,6 +29,7 @@ from app.api.schemas.crawler_schema import (
 from app.crawler.tccic.spiders.card_list_spider import CardListSpider
 from app.crawler.tccic.spiders.card_feature_spider import CardFeatureSpider
 from app.crawler.tccic import settings as project_settings
+from app.services.callback import CallbackNotifier
 from app.services.rag import RAG
 from app.services.store import Store
 from app.configs.global_settings import global_settings
@@ -109,12 +110,13 @@ def _card_list_stats(jsonl_path: Path) -> dict:
     return {"cards": len(cards), "pages": len(pages)}
 
 
-def run_card_list_spider(spider_data: list[CardListSpiderData], store: Store):
+def run_card_list_spider(spider_data: list[CardListSpiderData], store: Store, notifier: CallbackNotifier):
     """
     Runs the card-list spider once per item, recording each job's outcome.
 
     Each item is isolated: one failure must not abandon the rest of a batch, nor
-    leave the remaining jobs stuck in a non-final state forever.
+    leave the remaining jobs stuck in a non-final state forever. Whatever the
+    outcome, its callbacks are sent once the item is done.
     """
     for data in spider_data:
         try:
@@ -140,9 +142,11 @@ def run_card_list_spider(spider_data: list[CardListSpiderData], store: Store):
         except Exception as e:
             logger.error(f"An error occurred during card list crawling: {e}")
             store.jobs.mark_failed(data.job_id, str(e))
+        finally:
+            notifier.notify(data.job_id)
 
 
-def run_card_feature_spider(spider_data: list[CardFeatureSpiderData], store: Store):
+def run_card_feature_spider(spider_data: list[CardFeatureSpiderData], store: Store, notifier: CallbackNotifier):
     """
     Runs the card-feature spider once per item, then vectorizes the results.
 
@@ -212,6 +216,8 @@ def run_card_feature_spider(spider_data: list[CardFeatureSpiderData], store: Sto
             except Exception as e:
                 logger.error(f"An error occurred during card feature crawling: {e}")
                 store.jobs.mark_failed(data.job_id, str(e))
+            finally:
+                notifier.notify(data.job_id)
     finally:
         if rag is not None:
             rag.close()
@@ -225,11 +231,14 @@ async def card_list(request: Request, body: CardListRequest):
     Submit a card-list crawl job. The job is queued and processed by a background worker.
     """
     store: Store = request.state.store
+    notifier: CallbackNotifier = request.state.notifier
     queue: asyncio.Queue = request.state.list_queue
     job_id = str(uuid4())
 
     try:
         store.jobs.create(job_id, "card_list", body.bank_code, body.url)
+        if body.callback_url:
+            store.callbacks.subscribe(job_id, body.callback_url)
 
         spider_data = [CardListSpiderData(
             config_path=CONFIG_PATH,
@@ -247,6 +256,7 @@ async def card_list(request: Request, body: CardListRequest):
         return JSONResponse(content=response.model_dump(), status_code=202)
     except asyncio.QueueFull:
         store.jobs.mark_failed(job_id, "Job queue is full.")
+        notifier.notify(job_id)
         response = BaseResponse(
             status="fail",
             message="Server is busy. Please retry later.",
@@ -277,6 +287,7 @@ async def batch_card_list(request: Request, body: list[CardListRequest]):
         return JSONResponse(content=response.model_dump(), status_code=400)
 
     store: Store = request.state.store
+    notifier: CallbackNotifier = request.state.notifier
     queue: asyncio.Queue = request.state.list_queue
     batch_id = str(uuid4())
     spider_data: list[CardListSpiderData] = []
@@ -285,6 +296,8 @@ async def batch_card_list(request: Request, body: list[CardListRequest]):
         for req in body:
             job_id = str(uuid4())
             store.jobs.create(job_id, "card_list", req.bank_code, req.url, batch_id=batch_id)
+            if req.callback_url:
+                store.callbacks.subscribe(job_id, req.callback_url)
             spider_data.append(CardListSpiderData(
                 config_path=CONFIG_PATH,
                 bank_code=req.bank_code,
@@ -306,6 +319,7 @@ async def batch_card_list(request: Request, body: list[CardListRequest]):
     except asyncio.QueueFull:
         for data in spider_data:
             store.jobs.mark_failed(data.job_id, "Job queue is full.")
+            notifier.notify(data.job_id)
         response = BaseResponse(
             status="fail",
             message="Server is busy. Please retry later.",
@@ -329,6 +343,7 @@ async def card_feature(request: Request, body: CardFeatureRequest):
     The job is queued and processed by a background worker.
     """
     store: Store = request.state.store
+    notifier: CallbackNotifier = request.state.notifier
     queue: asyncio.Queue = request.state.feature_queue
     job_id = str(uuid4())
 
@@ -338,6 +353,9 @@ async def card_feature(request: Request, body: CardFeatureRequest):
 
         if active is not None:
             logger.info(f"Card '{body.card_name}' is already {active.status}; returning job {active.job_id}.")
+            if body.callback_url:
+                store.callbacks.subscribe(active.job_id, body.callback_url)
+                notifier.notify(active.job_id)
             response = BaseResponse[JobIDResponse](
                 status="success",
                 message=f"This card is already being crawled (job is '{active.status}').",
@@ -351,6 +369,8 @@ async def card_feature(request: Request, body: CardFeatureRequest):
             return JSONResponse(content=response.model_dump(), status_code=200)
 
         store.jobs.create(job_id, "card_feature", body.bank_code, body.card_url, card_key=card.card_key)
+        if body.callback_url:
+            store.callbacks.subscribe(job_id, body.callback_url)
 
         spider_data = [CardFeatureSpiderData(
             config_path=CONFIG_PATH,
@@ -375,6 +395,7 @@ async def card_feature(request: Request, body: CardFeatureRequest):
         return JSONResponse(content=response.model_dump(), status_code=202)
     except asyncio.QueueFull:
         store.jobs.mark_failed(job_id, "Job queue is full.")
+        notifier.notify(job_id)
         response = BaseResponse(
             status="fail",
             message="Server is busy. Please retry later.",
@@ -405,6 +426,7 @@ async def batch_card_feature(request: Request, body: list[CardFeatureRequest]):
         return JSONResponse(content=response.model_dump(), status_code=400)
 
     store: Store = request.state.store
+    notifier: CallbackNotifier = request.state.notifier
     queue: asyncio.Queue = request.state.feature_queue
     batch_id = str(uuid4())
     spider_data: list[CardFeatureSpiderData] = []
@@ -419,6 +441,9 @@ async def batch_card_feature(request: Request, body: list[CardFeatureRequest]):
             active = store.jobs.find_active_by_card_key(card.card_key)
             if active is not None:
                 duplicates += 1
+                if req.callback_url:
+                    store.callbacks.subscribe(active.job_id, req.callback_url)
+                    notifier.notify(active.job_id)
                 acknowledged.append(JobIDResponse(
                     job_id=active.job_id,
                     bank_code=req.bank_code,
@@ -432,6 +457,8 @@ async def batch_card_feature(request: Request, body: list[CardFeatureRequest]):
                 job_id, "card_feature", req.bank_code, req.card_url,
                 card_key=card.card_key, batch_id=batch_id
             )
+            if req.callback_url:
+                store.callbacks.subscribe(job_id, req.callback_url)
             spider_data.append(CardFeatureSpiderData(
                 config_path=CONFIG_PATH,
                 bank_code=req.bank_code,
@@ -466,6 +493,7 @@ async def batch_card_feature(request: Request, body: list[CardFeatureRequest]):
         # that are still live and must not be marked failed.
         for data in spider_data:
             store.jobs.mark_failed(data.job_id, "Job queue is full.")
+            notifier.notify(data.job_id)
         response = BaseResponse(
             status="fail",
             message="Server is busy. Please retry later.",

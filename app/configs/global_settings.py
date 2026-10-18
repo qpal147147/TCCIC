@@ -98,6 +98,12 @@ class GlobalSettings(BaseSettings):
     CRAWL_QUEUE_MAX_SIZE: int = 50        # Max jobs waiting in queue; returns 503 when full
     CRAWL_BATCH_MAX_SIZE: int = 50        # Max items allowed per batch request
 
+    # Job callback (webhook) settings — payloads are signed with AUTH_KEY
+    CALLBACK_ALLOW_PRIVATE: bool = False  # Allow private/loopback targets; development only
+    CALLBACK_TIMEOUT_S: float = 10.0      # Per-attempt timeout
+    CALLBACK_RETRY_DELAYS_S: tuple[float, ...] = (5.0, 30.0, 120.0)  # Waits between attempts
+    CALLBACK_MAX_WORKERS: int = 4         # Threads delivering callbacks concurrently
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def get_active_llm_config(self) -> BaseModelConfig:
