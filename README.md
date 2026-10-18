@@ -60,6 +60,7 @@ Taiwan Credit Card Information Crawler (TCCIC) API
 - [x] Add summary cache-hit path to reduce LLM usage
 - [x] Added analysis of all chunks within a single card to extract established facts for fast search.
 - [x] Routes the user's question to `vector` or `SQL` search based on its type.
+- [x] Add a callback parameter to the API to notify when a job completes
 
 </details>
 
@@ -98,12 +99,18 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
         ```python
         VECTOR_CLIENT_URL: str = "http://localhost:19530"
         ```
-    * [API Key](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/.env)
+    * API Key  
+    Copy [.env.example](.env.example) to `.env` and fill in your keys. `.env` is ignored by git, so your keys are never committed.
+        ```bash
+        cp .env.example .env
+        ```
+        `AUTH_KEY` is the key your clients send in the `X-API-Key` header. It also signs [callbacks](#callback).
 
 4. Run API Server
     ```python
     python -m app.main
     ```
+    The SQLite database that stores jobs, cards and the summary cache is created automatically on first start, and its schema is upgraded on every start. No setup is needed.
 ## Additional Notes
 1. [Log settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L81)
 
@@ -111,20 +118,29 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
 
 3. [Crawler concurrency settings](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L95)
 
-4. Custom LLM and Embedding
-    1. Implement basic parameters in [your class](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L7).
+4. Callback settings  
+    Defined in `GlobalSettings` in `app/configs/global_settings.py`.
+    ```python
+    CALLBACK_ALLOW_PRIVATE: bool = False  # Allow localhost / private targets; development only
+    CALLBACK_TIMEOUT_S: float = 10.0      # Per-attempt timeout
+    CALLBACK_RETRY_DELAYS_S: tuple[float, ...] = (5.0, 30.0, 120.0)  # Waits between attempts
+    CALLBACK_MAX_WORKERS: int = 4         # Threads delivering callbacks concurrently
+    ```
+
+5. Custom LLM and Embedding
+    1. Implement basic parameters in [your class](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/global_settings.py#L7).  
+    Extend `BaseModelConfig` and set its fields; `rate_limit_sleep_s` and `llm_batch_size` have defaults.
         ```python
-        class CustomLLMConfig(BaseModel):
+        class CustomLLMConfig(BaseModelConfig):
             """Custom LLM config"""
-            api_key: SecretStr
-            chat_model_name: str
-            temperature: float
-            max_tokens: int
-            embedding_model_name: str
-            embedding_dim: int
-            gpu: bool
-            rate_limit_sleep_s: float
-            llm_batch_size: int
+            chat_model_name: str = "your-chat-model"
+            temperature: float = 0.5
+            max_tokens: int = 8192
+            embedding_model_name: str = "your-embedding-model"
+            embedding_dim: int = 1024
+            gpu: bool = False
+            rate_limit_sleep_s: float = 0.0
+            llm_batch_size: int = 10
         ```
     2. Add custom options to lists and functions
         ```python
@@ -184,8 +200,8 @@ Follow the installation guide on [this page](https://milvus.io/docs/install_stan
                     return CustomEmbedding(...)
         ```
     
-4. Customize Crawling Scope  
-    You can find all bank-related crawler configurations in [this file](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/configs/banks.yaml).
+6. Customize Crawling Scope  
+    Each bank has its own crawler configuration file in [app/configs/banks/](app/configs/banks), named `<bank_code>.yaml`.
     Each parameter defines the scope of data extraction on the webpage.  
     To modify the crawler behavior, adjust [Card List Spider](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/crawler/tccic/spiders/card_list_spider.py) and [Card Feature Spider](https://github.com/qpal147147/TCCIC/blob/12dcc9c79ac329ce837854958af9c0ac0e97430b/app/crawler/tccic/spiders/card_feature_spider.py) to implement your custom crawling logic.
 
@@ -229,14 +245,18 @@ A RESTful API for web crawling, data retrieval, and conversation.
     ```json
     {
         "bank_code": "taishin",
-        "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/"
+        "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/",
+        "callback_url": "https://your-server.example.com/tccic-hook"
     }
     ```
     * **bank_code** string, Required  
-    The bank’s unique identifier
+    The bank’s unique identifier. Only lowercase letters, digits, `-` and `_` are allowed.
 
     * **url** string, Required  
     The URL of the bank’s card overview page
+
+    * **callback_url** string, Optional  
+    The URL to be notified when the job finishes. See [Callback](#callback).
 
     #### Return
     ```json
@@ -245,10 +265,9 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "message": "The crawling job has been submitted successfully.",
         "data": {
             "job_id": "85cc5f76-8184-4d1d-8936-ea0ca1ca84f3",
-            "list_id": "list-73e807e2472d415888e968ceeeb63e87",
             "bank_code": "taishin",
             "card_name": null,
-            "card_id": null
+            "card_key": null
         },
         "error": null
     }
@@ -261,22 +280,21 @@ A RESTful API for web crawling, data retrieval, and conversation.
 
     * **data** object or null  
         * **job_id** string  
-        The execution job ID, which is unique for each run.
-
-        * **list_id** string or null  
-        The list ID that stores the crawling information, used for retrieval.
+        The execution job ID, which is unique for each run. Use it to query the status and result in [Jobs](#jobs).
 
         * **bank_code** string or null  
         The bank code crawled for this task.
 
         * **card_name** string or null  
-        The card name crawled for this task.
+        The card name crawled for this task. Always `null` for card list jobs.
 
-        * **card_id** string or null  
-        The unique card ID used for conversation and deletion; each card has a different ID.
+        * **card_key** string or null  
+        The card’s unique key. Always `null` for card list jobs.
     
     * **error** string or null  
     If an error occurs during execution, this field records the error message.
+
+    Returns `202` when the job is queued, `422` if a parameter is invalid, and `503` if the job queue is full (retry after the `Retry-After` header).
 
 2. #### Batch crawl all cards from the specified bank
     ```
@@ -307,91 +325,25 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "data": [
             {
                 "job_id": "cbf76934-815a-4128-bb97-f7e86145a79b",
-                "list_id": "list-928db6b5417e47edbe9985d14c2d1c93",
                 "bank_code": "taishin",
                 "card_name": null,
-                "card_id": null
+                "card_key": null
             },
             {
-                "job_id": "cbf76934-815a-4128-bb97-f7e86145a79b",
-                "list_id": "list-d6a617d06cc54867a59eb63611dd061f",
+                "job_id": "0d3a5e21-6f7b-4c1e-9a52-3b8e4f1c7d90",
                 "bank_code": "ctbcbank",
                 "card_name": null,
-                "card_id": null
+                "card_key": null
             }
         ],
         "error": null
     }
     ```
-    The parameters are the same as the non-batch list crawler, with only the `data` field changed to an array format.
+    The parameters are the same as the non-batch list crawler, with only the `data` field changed to an array format. Each item is a separate job with its own `job_id`; all jobs in one request share a `batch_id`.
 
-3. #### Retrieve the card list information.
-    ```
-    GET http://localhost:1108/api/v1/crawler/card-list/{list_id}
-    ```
+    Returns `400` if the request has more items than the batch limit (default `50`).
 
-    #### Request
-    Path parameters
-    ```
-    http://localhost:1108/api/v1/crawler/card-list/list-928db6b5417e47edbe9985d14c2d1c93
-    ```
-    * **list_id** string, Required  
-    The list ID used for querying information.
-
-    #### Return
-    ```json
-    {
-        "status": "success",
-        "message": "Successfully crawled all card information.",
-        "data": {
-            "bank_code": "taishin",
-            "bank_name": "台新銀行",
-            "pages": [
-                {
-                    "page_url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/index.html?type=type1",
-                    "cards": [
-                        {
-                            "title": "太陽卡/玫瑰卡(切換刷方案)",
-                            "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg046/card001/"
-                        },
-                        {
-                            "title": "@GoGo卡",
-                            "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg021/card001/"
-                        },
-                    ]
-                },
-                {
-                    "page_url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/index.html?type=type3",
-                    "cards": [
-                        {
-                            "title": "玫瑰卡",
-                            "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg013/card0001/"
-                        },
-                    ]
-                }
-            ]
-        },
-        "error": null
-    }
-    ```
-    * **bank_code** string  
-    The bank code crawled for this task.
-
-    * **bank_name** string  
-    The bank name crawled for this task.
-
-    * **pages** array
-        * **page_url** string  
-        The URL of the card list.
-
-        * **cards** array
-            * **title** string  
-            Card name
-
-            * **url** string  
-            Card URL
-
-4. #### Crawl card details information and save it as vectors
+3. #### Crawl card details information and save it as vectors
     ```
     POST http://localhost:1108/api/v1/crawler/card-feature
     ```
@@ -402,17 +354,21 @@ A RESTful API for web crawling, data retrieval, and conversation.
     {
         "bank_code": "taishin",
         "card_name": "FlyGo卡",
-        "card_url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg018/flygo/"
+        "card_url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg018/flygo/",
+        "callback_url": "https://your-server.example.com/tccic-hook"
     }
     ```
     * **bank_code** string, Required  
-    The bank’s unique identifier
+    The bank’s unique identifier. Only lowercase letters, digits, `-` and `_` are allowed.
 
     * **card_name** string, Required  
     Card name
 
     * **card_url** string, Required  
-    Card URL 
+    Card URL. Must start with `http://` or `https://`.
+
+    * **callback_url** string, Optional  
+    The URL to be notified when the job finishes. See [Callback](#callback).
 
     #### Return
     ```json
@@ -421,19 +377,15 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "message": "The crawling job has been submitted successfully.",
         "data": {
             "job_id": "38be2bcf-67ca-4882-b241-18f8b8af32bf",
-            "list_id": null,
             "bank_code": "taishin",
             "card_name": "FlyGo卡",
-            "card_id": "card-870283de1f264befabbae33cdb1bf5c3"
+            "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1"
         },
         "error": null
     }
     ```
     * **job_id** string  
-    The execution job ID, which is unique for each run.
-
-    * **list_id** string or null  
-    The list ID that stores the crawling information, used for retrieval.
+    The execution job ID, which is unique for each run. Use it to query the status and result in [Jobs](#jobs).
 
     * **bank_code** string or null  
     The bank code crawled for this task.
@@ -441,10 +393,12 @@ A RESTful API for web crawling, data retrieval, and conversation.
     * **card_name** string or null  
     The card name crawled for this task.
 
-    * **card_id** string or null  
-    The unique card ID used for conversation and deletion; each card has a different ID.
+    * **card_key** string or null  
+    The card’s unique key, derived from the bank code and card URL. It stays the same when the card is re-crawled, so it can be stored permanently and used for conversation and deletion.
 
-5. #### Batch Crawl card details information and save it as vectors
+    Returns `202` when the job is queued. If the same card is already queued or running, no new job is created: the existing `job_id` is returned with `200`, and the `callback_url` of this request is also notified when that job finishes. Returns `422` if a parameter is invalid, and `503` if the job queue is full.
+
+4. #### Batch Crawl card details information and save it as vectors
     ```
     POST http://localhost:1108/api/v1/crawler/batch/card-feature
     ```
@@ -475,36 +429,79 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "data": [
             {
                 "job_id": "38be2bcf-67ca-4882-b241-18f8b8af32bf",
-                "list_id": null,
                 "bank_code": "taishin",
                 "card_name": "FlyGo卡",
-                "card_id": "card-870283de1f264befabbae33cdb1bf5c3"
+                "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1"
             },
             {
-                "job_id": "4abbb502-2301-73f4-216e-ad72a034c35f",
-                "list_id": null,
+                "job_id": "4abbb502-2301-43f4-916e-ad72a034c35f",
                 "bank_code": "taishin",
                 "card_name": "太陽卡/玫瑰卡",
-                "card_id": "card-870283de1f264befabbae33cdb1bf5c3"
-            },
+                "card_key": "2c7e4b9a1d3f5e6c8a0b2d4f6e8a1c3e5b7d9f0a"
+            }
         ],
         "error": null
     }
     ```
-    The parameters are the same as the non-batch card crawler, with only the `data` field changed to an array format.
+    The parameters are the same as the non-batch card crawler, with only the `data` field changed to an array format. A card that is already queued or running returns its existing `job_id`, the same as the non-batch crawler.
 
-6. #### Retrieve the processing status of the card details information.
+    Returns `202` if any new job is queued, `200` if every card is already queued or running, and `400` if the request has more items than the batch limit (default `50`).
+
+### Callback
+If a crawler request includes `callback_url`, the service sends one `POST` request to that URL when the job finishes, whether it succeeded or failed. You need to provide an endpoint that accepts the request below. Polling [Jobs](#jobs) still works with or without a callback.
+
+1. #### Request sent to your endpoint
+    Headers
     ```
-    GET http://localhost:1108/api/v1/crawler/card-feature/{job_id}/status
+    Content-Type: application/json
+    X-TCCIC-Job-Id: 38be2bcf-67ca-4882-b241-18f8b8af32bf
+    X-TCCIC-Timestamp: 1760720440
+    X-TCCIC-Signature: sha256=5f2c8e...
+    ```
+    * **X-TCCIC-Job-Id** string  
+    The job that finished.
+
+    * **X-TCCIC-Timestamp** string  
+    Unix time in seconds when the request was sent. Reject old timestamps to prevent replayed requests.
+
+    * **X-TCCIC-Signature** string  
+    `sha256=` followed by the hex HMAC-SHA256 of `{timestamp}.{raw body}`, signed with your API key.
+
+    The body is the same as the `data` of [Retrieve the job status](#jobs). It does not include the crawl result; retrieve it from [Retrieve the job result](#jobs).
+
+2. #### Verify the signature
+    ```python
+    import hashlib
+    import hmac
+
+    def verify(api_key: str, timestamp: str, body: bytes, signature: str) -> bool:
+        expected = hmac.new(api_key.encode(), f"{timestamp}.".encode() + body, hashlib.sha256)
+        return hmac.compare_digest(f"sha256={expected.hexdigest()}", signature)
+    ```
+    Verify against the raw request body. Parsing and re-serializing the JSON changes the bytes and the signature will not match.
+
+3. #### Response from your endpoint
+    Return any `2xx` status code. `5xx`, `408`, `429`, timeouts and connection errors are retried, up to 4 attempts in total (waiting 5, 30 and 120 seconds). Other `4xx` status codes are not retried.
+
+    `callback_url` must start with `http://` or `https://` and must not point to `localhost` or a private network address, otherwise the crawler request returns `422`. To test locally, set `CALLBACK_ALLOW_PRIVATE = True` in `global_settings.py` and run the [example receiver](scripts/callback_receiver.py):
+    ```bash
+    python -m scripts.callback_receiver --port 9000
+    ```
+
+### Jobs
+
+1. #### Retrieve the job status
+    ```
+    GET http://localhost:1108/api/v1/jobs/{job_id}
     ```
 
     #### Request
     Path parameters
     ```
-    http://localhost:1108/api/v1/crawler/card-feature/38be2bcf-67ca-4882-b241-18f8b8af32bf/status
+    http://localhost:1108/api/v1/jobs/38be2bcf-67ca-4882-b241-18f8b8af32bf
     ```
     * **job_id** string, Required  
-    The execution job ID
+    The execution job ID returned by the crawler API. Works for both card list and card feature jobs.
 
     #### Return
     ```json
@@ -512,26 +509,161 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "status": "success",
         "message": "Query job status successfully.",
         "data": {
-            "job_status": "completed"
+            "job_id": "38be2bcf-67ca-4882-b241-18f8b8af32bf",
+            "job_type": "card_feature",
+            "status": "completed",
+            "bank_code": "taishin",
+            "target_url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg018/flygo/",
+            "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1",
+            "batch_id": null,
+            "error": null,
+            "stats": {
+                "images": 21,
+                "cached": 21,
+                "summarized": 0,
+                "failed": 0,
+                "vectorized": 88,
+                "facts_extracted": true
+            },
+            "created_at": "2026-10-17T08:00:00.000000Z",
+            "started_at": "2026-10-17T08:00:01.000000Z",
+            "finished_at": "2026-10-17T08:03:12.000000Z"
         },
         "error": null
     }
     ```
-    * **job_status** string  
-    The status of the execution job: `pending` (in progress), `completed` (success), `error` (failed).
+    * **job_id** string  
+    The execution job ID
+
+    * **job_type** string  
+    `card_list` or `card_feature`
+
+    * **status** string  
+    The status of the job: `queued` (waiting in the queue), `running` (in progress), `completed` (success), `error` (failed), `config_broken` (the crawler settings no longer match the page).
+
+    * **bank_code** string  
+    The bank code crawled for this task.
+
+    * **target_url** string  
+    The URL crawled for this task.
+
+    * **card_key** string or null  
+    The card’s unique key. `null` for card list jobs.
+
+    * **batch_id** string or null  
+    Shared by all jobs submitted in one batch request. `null` for non-batch requests.
+
+    * **error** string or null  
+    The reason the job failed.
+
+    * **stats** object or null  
+    What the job produced. Card list jobs report `cards` and `pages`. Card feature jobs report `images` (screenshots), `cached` (summaries reused without calling the LLM), `summarized` (summaries newly generated), `failed` (images that could not be summarized), `vectorized` (records saved to the vector database) and `facts_extracted`.
+
+    * **created_at**, **started_at**, **finished_at** string or null  
+    When the job was submitted, started and finished, in UTC.
+
+    Returns `404` if the job does not exist.
+
+2. #### Retrieve the job result
+    ```
+    GET http://localhost:1108/api/v1/jobs/{job_id}/result
+    ```
+
+    #### Request
+    Path parameters
+    ```
+    http://localhost:1108/api/v1/jobs/85cc5f76-8184-4d1d-8936-ea0ca1ca84f3/result
+    ```
+    * **job_id** string, Required  
+    The execution job ID
+
+    #### Return (card list job)
+    ```json
+    {
+        "status": "success",
+        "message": "Successfully crawled all card information.",
+        "data": {
+            "bank_code": "taishin",
+            "bank_name": "台新銀行",
+            "pages": [
+                {
+                    "page_url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/index.html?type=type1",
+                    "cards": [
+                        {
+                            "title": "太陽卡/玫瑰卡(切換刷方案)",
+                            "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg046/card001/"
+                        },
+                        {
+                            "title": "@GoGo卡",
+                            "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/cg021/card001/"
+                        }
+                    ]
+                }
+            ]
+        },
+        "error": null
+    }
+    ```
+    * **bank_code** string  
+    The bank code crawled for this task.
+
+    * **bank_name** string  
+    The bank name crawled for this task.
+
+    * **pages** array
+        * **page_url** string  
+        The URL of the card list.
+
+        * **cards** array
+            * **title** string  
+            Card name
+
+            * **url** string  
+            Card URL
+
+    #### Return (card feature job)
+    ```json
+    {
+        "status": "success",
+        "message": "Card feature crawl completed and vectorized.",
+        "data": {
+            "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1",
+            "card_name": "FlyGo卡",
+            "bank_code": "taishin",
+            "stats": {
+                "images": 21,
+                "cached": 21,
+                "summarized": 0,
+                "failed": 0,
+                "vectorized": 88,
+                "facts_extracted": true
+            }
+        },
+        "error": null
+    }
+    ```
+    The card content is saved in the vector database. Use `card_key` in [Card](#card) to chat about or delete it.
+
+    | Status code | Meaning |
+    |-------------|---------|
+    | `200` | The job completed. |
+    | `400` | The job failed; `error` holds the reason. |
+    | `404` | The job does not exist. |
+    | `409` | The job is still `queued` or `running`; retry after the `Retry-After` header. |
+    | `410` | The job completed but its result file has been deleted. |
 
 
 ### Card
 
 1. #### List all vectorized cards
     ```
-    GET http://localhost:1108/api/v1/card/
+    GET http://localhost:1108/api/v1/card
     ```
 
     #### Request
     Query parameters (optional)
     ```
-    http://localhost:1108/api/v1/card/?bank_code=taishin
+    http://localhost:1108/api/v1/card?bank_code=taishin
     ```
     * **bank_code** string, Optional  
     Filter results by bank code. Omit to return all cards.
@@ -543,12 +675,12 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "message": "Found 2 card(s).",
         "data": [
             {
-                "card_id": "card-870283de1f264befabbae33cdb1bf5c3",
+                "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1",
                 "card_name": "FlyGo卡",
                 "bank_code": "taishin"
             },
             {
-                "card_id": "card-c1e620f1afb049dea8bcd238e29b80c1",
+                "card_key": "2c7e4b9a1d3f5e6c8a0b2d4f6e8a1c3e5b7d9f0a",
                 "card_name": "太陽卡/玫瑰卡",
                 "bank_code": "taishin"
             }
@@ -566,9 +698,9 @@ A RESTful API for web crawling, data retrieval, and conversation.
     Content-Type: application/json
     ```json
     {
-        "question": "信用卡的回饋額度",
+        "question": "FlyGo卡的海外回饋是多少？",
         "bank_code": "taishin",
-        "card_id": "card-870283de1f264befabbae33cdb1bf5c3"
+        "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1"
     }
     ```
     * **question** string, Required  
@@ -577,10 +709,14 @@ A RESTful API for web crawling, data retrieval, and conversation.
     * **bank_code** string or null  
     Bank code used to restrict bank queries.
 
-    * **card_id** string or null  
-    Card ID used to restrict card queries.
+    * **card_key** string or null  
+    Card key used to restrict card queries.
 
-    You may use any combination of `bank_code` and `card_id` to restrict the search range.
+    You may use any combination of `bank_code` and `card_key` to restrict the search range.
+
+    The question is answered in one of two ways, reported in `route`:
+    * **vector**: searches the card content in the vector database. Used when `card_key` is given, and for questions about details such as a card’s offers or conditions.
+    * **sql**: compares the facts of every card, such as annual fee, rewards and travel benefits. Used for questions that rank cards, such as "哪張卡年費最低？". Rewards in different forms (cash, points, miles) are listed separately rather than compared directly.
 
     #### Return
     ```json
@@ -588,22 +724,25 @@ A RESTful API for web crawling, data retrieval, and conversation.
         "status": "success",
         "message": "Query successfully.",
         "data": {
-            "response": "台新銀行信用卡的相關回饋額度如下...",
+            "response": "FlyGo卡海外消費最高享3%回饋...",
+            "route": "vector",
             "sources": [
                 {
-                    "text": "這是一張台新銀行信用卡的資訊頁面，主要介紹了 FlyGo...", 
+                    "text": "FlyGo卡｜回饋\n海外消費：最高3%回饋...",
                     "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/future/bf0a55e5-1f47-11f0-b432-0050568c09e3",
-                    "card_id": "card-c1e620f1afb049dea8bcd238e29b80c1",
+                    "section": "回饋",
+                    "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1",
                     "card_name": "FlyGo卡",
                     "bank_code": "taishin"
                 },
                 {
-                    "text": "台新銀行FlyGo卡提供精選航旅最高5%，海外最高3%回饋...",
+                    "text": "FlyGo卡｜優惠活動\n精選航旅最高5%回饋...",
                     "url": "https://www.taishinbank.com.tw/TSB/personal/credit/intro/overview/future/89cd913a-8172-11ef-b432-0050568c09e3",
-                    "card_id": "card-c1e620f1afb049dea8bcd238e29b80c1",
+                    "section": "優惠活動",
+                    "card_key": "9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1",
                     "card_name": "FlyGo卡",
                     "bank_code": "taishin"
-                },
+                }
             ]
         },
         "error": null
@@ -612,15 +751,21 @@ A RESTful API for web crawling, data retrieval, and conversation.
     * **response** string  
     AI’s summary response
 
+    * **route** string  
+    How the question was answered: `vector` or `sql`.
+
     * **sources** array
         * **text** string  
-        Source text of the data
+        Source text of the data. On the `sql` route, the facts of the card that were compared.
 
         * **url** string  
         Source url of the data
 
-        * **card_id** string  
-        Source card ID of the data
+        * **section** string or null  
+        Topic of the source text: `產品特色`, `回饋`, `優惠活動`, `年費`, `申請資格`, `注意事項` or `其他`. `null` on the `sql` route.
+
+        * **card_key** string  
+        Source card key of the data
 
         * **card_name** string  
         Source card name of the data
@@ -630,16 +775,18 @@ A RESTful API for web crawling, data retrieval, and conversation.
 
 3. #### Delete Card
     ```
-    DELETE http://localhost:1108/api/v1/card/{card_id}
+    DELETE http://localhost:1108/api/v1/card/{card_key}
     ```
 
     #### Request
     Path parameters
     ```
-    http://localhost:1108/api/v1/card/card-c1e620f1afb049dea8bcd238e29b80c1
+    http://localhost:1108/api/v1/card/9a1f0c3e7b2d4856a0e1f2c3b4d5e6f7a8b9c0d1
     ```
-    * **card_id**: string, Required  
-    The card’s unique ID
+    * **card_key**: string, Required  
+    The card’s unique key
 
     #### Return
     * Status: 204(Success)
+
+    Deletes the card’s vectors and facts. The card itself is kept, and crawling it again restores them.
