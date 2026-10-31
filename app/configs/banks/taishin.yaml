@@ -41,12 +41,16 @@ features:
   - card_code: cg047
     cookie_button:
     focus:
-      - content: //div[@class="ts-comp-40-1 no-border-bottom"]
+      - content: //div[@class="ts-comp-40-1 no-border-bottom"]   # Card features
         link: .//a
-      - content: //div[@id="ts-comp-41-collapse-2"]
-        link: .//a
-      - content: //div[@id="ts-comp-41-collapse-3"]
-        link: .//a
+      - content: //div[@class="ts-comp-40-3 no-border-bottom"]   # Promotions: one capture per tab
+        link: .//a[@data-toggle="tab"]
+      - content: //div[@class="ts-comp-40-4 no-border-bottom"]   # Card offers
+        link: .//a[not(contains(@class,"oval-style"))]           # skips "看更多"
+      - content: //div[@class="ts-comp-40-5 no-border-bottom"]   # Eligibility: one capture per tab
+        link: .//a[@data-toggle="tab"]
+      - content: //div[@class="ts-comp-40-7 no-border-bottom"]   # Important notices
+        link: .//a[contains(@class,"linkktxt")]                  # skips "看更多"
 
   - card_code: cg021
     cookie_button:

@@ -6,19 +6,29 @@ Purpose:
     avoids repeating downstream work.
 
 Status:
-    Nothing consumes the fingerprint yet. It is recorded alongside each
-    capture so its stability can be measured against real bank sites
-    before any caching depends on it.
+    The summary cache is keyed by this fingerprint, so two captures that
+    show different content must never share one: the second would be
+    served the first one's summary and its own content would be lost.
+    A capture of the same content fingerprinting differently only costs
+    a re-summarization.
 
 Source:
     The rendered DOM, not the screenshot. Pixels change with animation
     frames, hover states and font rendering even when the content has not.
 
 Inputs (deliberately only two):
-    innerText: Rendered text only, so hidden navigation, scripts and
+    Visible text: Rendered text only, so hidden navigation, scripts and
         bot-detection tokens injected as attributes never reach it.
     <img> src: About 70% of a Taiwanese card page's promotional detail
         lives in images; text alone would miss most changes.
+
+Visible means what the screenshot shows: inside the captured region and not
+cut off by an overflow-clipping ancestor. innerText alone is not enough —
+a carousel moves its other slides out of view with a CSS transform, so they
+stay in innerText, and every slide would fingerprint the same. The cache
+would then hand one slide's summary to all the others. Text is ordered by
+on-screen position rather than DOM order, because a looping carousel
+reorders its slides in the DOM without changing what is shown.
 
 Excluded:
     CSS background images, inline SVG text and natural image dimensions.
@@ -40,13 +50,63 @@ from playwright.async_api import Locator, Page, Error as PlaywrightError
 # place the content exists at all.
 _COLLECT_JS = """
 el => {
-  const text = (el.innerText || "").replace(/\\s+/g, " ").trim();
+  // A whole-page capture has no outer bound; an element capture is bounded by the element.
+  const whole = el === document.body || el === document.documentElement;
+  const clips = new Map();
+  const styles = new Map();
+  const styleOf = node => {
+    if (!styles.has(node)) styles.set(node, getComputedStyle(node));
+    return styles.get(node);
+  };
+
+  // The box a descendant of `node` can be seen through: the captured element,
+  // narrowed by every overflow-clipping ancestor in between. null = unbounded.
+  const clipOf = node => {
+    if (!node || node === el) {
+      if (whole) return null;
+      const r = el.getBoundingClientRect();
+      return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    }
+    if (clips.has(node)) return clips.get(node);
+    let box = clipOf(node.parentElement);
+    const s = styleOf(node);
+    if (/hidden|clip|auto|scroll/.test(s.overflowX + " " + s.overflowY)) {
+      const r = node.getBoundingClientRect();
+      box = box
+        ? { l: Math.max(box.l, r.left), t: Math.max(box.t, r.top), r: Math.min(box.r, r.right), b: Math.min(box.b, r.bottom) }
+        : { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    }
+    clips.set(node, box);
+    return box;
+  };
+
+  const shows = (rect, box) =>
+    rect.width > 0 && rect.height > 0 && (!box || (
+      Math.min(rect.right, box.r) - Math.max(rect.left, box.l) > 1 &&
+      Math.min(rect.bottom, box.b) - Math.max(rect.top, box.t) > 1));
+
+  const parts = [];
+  const range = document.createRange();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const value = node.nodeValue.replace(/\\s+/g, " ").trim();
+    const parent = node.parentElement;
+    if (!value || !parent || styleOf(parent).visibility !== "visible") continue;
+    range.selectNodeContents(node);
+    const box = clipOf(parent);
+    const rect = Array.from(range.getClientRects()).find(r => shows(r, box));
+    if (rect) parts.push({ top: Math.round(rect.top + scrollY), left: Math.round(rect.left + scrollX), value: value });
+  }
+  parts.sort((a, b) => a.top - b.top || a.left - b.left);
+
   const srcs = [];
   for (const img of el.querySelectorAll("img")) {
     const src = img.currentSrc || img.src;
-    if (src) srcs.push(src);
+    if (src && styleOf(img).visibility === "visible" && shows(img.getBoundingClientRect(), clipOf(img.parentElement))) {
+      srcs.push(src);
+    }
   }
-  return { text: text, srcs: srcs };
+  return { text: parts.map(p => p.value).join(" "), srcs: srcs };
 }
 """.strip()  # stripped so Playwright reads it unambiguously as a function expression
 

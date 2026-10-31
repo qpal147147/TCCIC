@@ -2,6 +2,7 @@ import json
 import shutil
 from pathlib import Path
 from itemadapter import ItemAdapter
+from scrapy.exceptions import DropItem
 
 from app.configs.global_settings import global_settings
 
@@ -23,6 +24,7 @@ class CardFeaturePipeline:
         spider.logger.debug(f"JSON path: {self.json_path}")
 
         self.data = []
+        self.seen_hashes: set[str] = set()
 
         try:
             self.file = open(self.json_path, "w", encoding="utf-8")
@@ -60,7 +62,18 @@ class CardFeaturePipeline:
 
     def process_item(self, item, spider):
         if self.enabled and self.file and item is not None:
-            item = json.dumps(ItemAdapter(item).asdict(), ensure_ascii=False)
+            adapter = ItemAdapter(item)
+
+            # The same content captured twice in one crawl (e.g. one page opened from
+            # two links) would only become duplicate records in the vector store.
+            content_hash = adapter.get("content_hash")
+            if content_hash:
+                if content_hash in self.seen_hashes:
+                    Path(adapter.get("image_path")).unlink(missing_ok=True)
+                    raise DropItem(f"Duplicate capture dropped: {adapter.get('image_path')} ({content_hash[:12]}).")
+                self.seen_hashes.add(content_hash)
+
+            item = json.dumps(adapter.asdict(), ensure_ascii=False)
             self.data.append(item)
 
         return item

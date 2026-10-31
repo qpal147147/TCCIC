@@ -17,6 +17,7 @@ _click_button()      -- utility: click the first visible element from a Locator 
 """
 
 import logging
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -57,6 +58,40 @@ async def _click_button(locator: Locator) -> None:
         if await btn.is_visible(timeout=1000):
             await btn.click(timeout=1000)
             break
+
+async def _screenshot_element(
+    page: Page, locator: Locator, image_path: str, logger: logging.Logger
+) -> None:
+    """
+    Screenshot an element in full by temporarily growing the viewport to fit it.
+
+    Elements in fixed, internally scrolling containers (e.g. modals) only paint
+    within the viewport, so a plain screenshot cuts off after the first screenful.
+    The viewport is restored afterwards.
+    """
+    max_capture_height = 16000  # Upper limit for the enlarged viewport height, in px.
+    viewport_margin = 100 # Extra px added to the viewport height as a buffer against rounding and layout shifts.
+    viewport = page.viewport_size
+    box = await locator.bounding_box()
+    if viewport is None or box is None or box["height"] <= viewport["height"]:
+        await locator.screenshot(path=image_path)
+        return
+
+    height = math.ceil(box["height"] + 2 * max(box["y"], 0)) + viewport_margin
+    if height > max_capture_height:
+        logger.warning(
+            f"Element is {round(box['height'])}px tall; capturing only the first "
+            f"{max_capture_height}px."
+        )
+        height = max_capture_height
+
+    try:
+        await page.set_viewport_size({"width": viewport["width"], "height": height})
+        await page.wait_for_timeout(300)  # let the page re-lay out at the new size
+        await locator.screenshot(path=image_path)
+    finally:
+        await page.set_viewport_size(viewport)
+        await page.wait_for_timeout(300)
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +136,7 @@ class RedirectHandler:
             fingerprint=await fingerprint_page(page, logger),
         )
         await page.go_back(wait_until="load")
+        await freeze_animations(page, logger) # # Going back reloads the page, which drops the CSS that froze animations.
         return result
 
 
@@ -126,13 +162,17 @@ class PopupHandler:
         logger: logging.Logger,
     ) -> ClickResult:
         captured = await self._screenshot_popup(
-            page, focus_item, focus_content_locator, image_path
+            page, focus_item, focus_content_locator, image_path, logger
         )
         if captured is None:
-            logger.warning(
-                "Popup content locator matched nothing visible; "
-                "fell back to focus-area screenshot."
-            )
+            if focus_item.popup and focus_item.popup.content:
+                logger.warning(
+                    "Popup content locator matched nothing visible; "
+                    "fell back to focus-area screenshot."
+                )
+            else:
+                # No popup configured: capturing the focus area is the intent, e.g. a tab switch.
+                logger.info("No popup configured; captured the focus area.")
 
         # Fingerprint exactly the region that was screenshotted, and do it before
         # the popup is dismissed.
@@ -151,6 +191,7 @@ class PopupHandler:
         focus_item: FocusItem,
         focus_content_locator: Locator,
         image_path: str,
+        logger: logging.Logger,
     ) -> Optional[Locator]:
         """
         Try to screenshot the popup region defined in focus_item.popup.content.
@@ -164,11 +205,11 @@ class PopupHandler:
             ).all()
             for locator in popup_locators:
                 if await locator.is_visible():
-                    await locator.screenshot(path=image_path)
+                    await _screenshot_element(page, locator, image_path, logger)
                     return locator
 
         # Fallback: screenshot the focus area itself
-        await focus_content_locator.screenshot(path=image_path)
+        await _screenshot_element(page, focus_content_locator, image_path, logger)
         return None
 
     async def _close_popup(self, page: Page, focus_item: FocusItem) -> None:

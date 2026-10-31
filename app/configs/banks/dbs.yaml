@@ -250,3 +250,29 @@ features:
         popup:
           content: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/..
           close_button: //div[contains(@class, "sc-14hgmz4") and not(contains(@class, "llZIKY"))]/../div[1]
+
+  - card_code: dbs-aov
+    cookie_button:
+    focus:
+      # 好刷不用選 / 娛樂生活神支援 / 玩家出國必備: each drawer, captured opened
+      - content: //div[contains(concat(' ',normalize-space(@class),' '),' drawer-item ')]
+        link: .//div[contains(concat(' ',normalize-space(@class),' '),' drawer-header ')]
+      # 基本回饋 / 存戶升級活動注意事項 modals
+      - content: //div[contains(@class,'topic_c')]
+        link: .//a[@data-bs-toggle='modal']
+        popup:
+          content: //div[contains(concat(' ',normalize-space(@class),' '),' modal ')][contains(concat(' ',normalize-space(@class),' '),' show ')]//div[contains(concat(' ',normalize-space(@class),' '),' modal-content ')]
+          close_button: //div[contains(concat(' ',normalize-space(@class),' '),' modal ')][contains(concat(' ',normalize-space(@class),' '),' show ')]//button[contains(concat(' ',normalize-space(@class),' '),' btn-close ')]
+      # 星耀理財 LINE Pay 最高加碼10%: 了解更多 (its href starts with whitespace)
+      - content: //div[@id='Life']
+        link: .//a[normalize-space()='了解更多'][contains(@href,'http')]
+      # 4 exclusive tabs: the active slide after each tab click
+      - content: //div[@id='Exclusive']
+        link: .//button[contains(concat(' ',normalize-space(@class),' '),' slider-tab-btn ')]
+        popup:
+          content: //div[@id='Exclusive']//div[contains(concat(' ',normalize-space(@class),' '),' swiper-slide-active ')]
+      # 出遊就刷星展卡 slider (3 per view, looping): the active slide after each dot
+      - content: //div[@id='Discount']
+        link: .//span[contains(concat(' ',normalize-space(@class),' '),' swiper-pagination-bullet ')]
+        popup:
+          content: //div[@id='Discount']//div[contains(concat(' ',normalize-space(@class),' '),' swiper-slide-active ')]

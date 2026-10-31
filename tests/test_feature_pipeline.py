@@ -12,6 +12,7 @@ import json
 import logging
 
 import pytest
+from scrapy.exceptions import DropItem
 
 from app.configs.global_settings import global_settings
 from app.crawler.tccic.items import FeatureItem
@@ -107,6 +108,41 @@ def test_recrawling_replaces_rather_than_accumulates(card_dir):
 
     assert len(records) == 1
     assert records[0]["content_hash"] == "run-1"
+
+
+def test_identical_content_in_one_crawl_is_kept_once(card_dir):
+    """A second capture of the same content would only duplicate a vector record."""
+    spider = StubSpider()
+    pipeline = CardFeaturePipeline()
+    pipeline.open_spider(spider)
+    duplicate = card_dir / "1_0_1.png"
+    duplicate.write_bytes(b"png")
+
+    pipeline.process_item(item("1_0_0.png", content_hash="same"), spider)
+    with pytest.raises(DropItem):
+        pipeline.process_item(FeatureItem(
+            page_url="https://bank.test/card", image_path=str(duplicate),
+            content_hash="same", text_len=120, img_count=3,
+        ), spider)
+    pipeline.process_item(item("1_0_2.png", content_hash="other"), spider)
+    pipeline.close_spider(spider)
+
+    lines = (card_dir / f"{CARD_KEY}.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["content_hash"] for line in lines] == ["same", "other"]
+    assert not duplicate.exists()  # no orphaned screenshot left behind
+
+
+def test_captures_without_a_fingerprint_are_never_dropped(card_dir):
+    """A missing fingerprint says nothing about content, so it cannot prove a duplicate."""
+    spider = StubSpider()
+    pipeline = CardFeaturePipeline()
+    pipeline.open_spider(spider)
+    for i in range(2):
+        pipeline.process_item(item(f"{i}.png", content_hash=None), spider)
+    pipeline.close_spider(spider)
+
+    lines = (card_dir / f"{CARD_KEY}.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
 
 
 def test_clearing_refuses_to_escape_the_data_directory(data_dir):
