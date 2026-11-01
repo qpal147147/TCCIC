@@ -254,7 +254,7 @@ async def click_and_capture(
 
     try:
         async with page.context.expect_page(timeout=3000) as new_page_info:
-            await link_locator.highlight()
+            # await link_locator.highlight()
             await link_locator.evaluate("el => el.click()")
 
         # Case 1: a new tab opened
