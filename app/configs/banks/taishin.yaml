@@ -28,7 +28,9 @@ features:
   # - cookie_button (str|null): Per-card override for the cookie-consent button selector.
   #                             Leave null to inherit the bank-level cookie_button above.
   # - focus (list): Ordered list of page regions to interact with.
-  #   - content (str): XPath of the region to screenshot and parse links from.
+  #   - content (str): XPath of the region whose links are clicked. It is captured itself
+  #                    when a click keeps the URL with no popup configured (tabs), or
+  #                    when link is omitted (each matching element is captured as it is).
   #   - link (str): XPath of clickable links within that region.
   #   - popup (object|null): Set only if clicking a link in this region opens an in-page popup
   #                          (i.e. the URL does not change and no new browser tab opens).
@@ -38,6 +40,20 @@ features:
   #         content: //div[@class="modal-body"]   # XPath of the popup area to screenshot
   #         close_button: //button[@class="close"] # Selector to close the popup afterwards
   #
+  #   - page_focus (list|null): Focus areas applied to the page a link opens (new tab or
+  #                             redirect), in place of its full-page screenshot. Same fields
+  #                             as focus; one level only. See cathaybk.yaml (cube).
+  #     Example:
+  #       - content: //div[@class="plans"]
+  #         link: (.//a[contains(@href,'plan-list')])[1]  # click only the first matching link
+  #         page_focus:
+  #           - content: //section[@data-plan]           # no link: capture each plan as it is
+  #           - content: //section[@data-plan]
+  #             link: .//a[normalize-space()='注意事項']   # each plan's notice modal
+  #             popup:
+  #               content: //div[@class="modal-body"]
+  #               close_button: //button[@class="close"]
+
   - card_code: cg047
     cookie_button:
     focus:

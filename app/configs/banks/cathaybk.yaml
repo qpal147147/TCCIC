@@ -8,11 +8,42 @@ xpaths:
     title: .//h3/text()
     url: .//a[contains(@title, "信用卡介紹-詳細說明")]//@href
 features:
+  # Field reference: see the features comments in taishin.yaml.
   - card_code: cube
     cookie_button:
     focus:
-      - content:
-        link:
+      # 掌握生活 盡在CUBE卡: links to other pages, except the rewards plan page
+      - content: //div[@data-anchor-block='blockname01']
+        link: .//a[@target='_blank'][not(contains(@href,'cube-list'))]
+      # 掌握生活: 查看權益方案 — two links open the same page, so click only the first
+      - content: //div[@data-anchor-block='blockname01']
+        link: (.//a[contains(@href,'cube-list')])[1]
+        page_focus:
+          # Each plan (秋日遊, 台塑家, ...), one capture each
+          - content: //section[@data-anchor-block]
+          # Each plan's 注意事項 modal
+          - content: //section[@data-anchor-block]
+            link: .//a[normalize-space()='注意事項']
+            popup: &cathay_modal   # the open modal's dialog box
+              content: //div[contains(concat(' ',normalize-space(@class),' '),' modal-popup-active ')]/div[.//h3]
+              close_button: //div[contains(concat(' ',normalize-space(@class),' '),' modal-popup-active ')]/div[.//h3]//*[@data-popup-close]
+      # 專屬權益 回饋升級: the cards are in main.png; only the 權益分級注意事項 modal
+      - content: //section[@data-anchor-block='level']
+        link: .//a[normalize-space()='權益分級注意事項']
+        popup: *cathay_modal
+      # 精選權益 由你切換: one capture per tab, of the whole block — the cards
+      # never name their plan, so the highlighted tab must be in the picture
+      - content: //section[@data-anchor-block='blockname03']
+        link: .//a[@data-graphic-tab-btn]
+      # 卡友贈禮 專屬為你準備: one capture per tab; each panel carries its own title
+      - content: //section[@data-anchor-block='blockname05']
+        link: .//a[@data-graphic-tab-btn]
         popup:
-          content: //ol[@class="w-full"]//li[@class="group is-active"]//div[contains(@class, "box-border")]
-          close_button: //div[@id='modal-popup'][contains(@class, 'modal-popup-active')]//div[contains(@class, "cursor-pointer")] | //li[@class="group is-active"]
+          content: //section[@data-anchor-block='blockname05']//div[@data-graphic-tab-content]
+      # 卡片基本資訊: each item, captured expanded (items open independently)
+      - content: //div[@data-anchor-block='blockname08']//li[@data-collapse='true']
+        link: ./div[@data-collapse-btn]
+      # 注意事項 at the page bottom, captured expanded
+      # (the rewards plan page carries the same text, so it is taken only here)
+      - content: //div[div[contains(concat(' ',normalize-space(@class),' '),' notice-dropdown-btn ')]]
+        link: ./div[contains(concat(' ',normalize-space(@class),' '),' notice-dropdown-btn ')]

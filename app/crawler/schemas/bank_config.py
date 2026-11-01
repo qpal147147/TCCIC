@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class CrawlPolicy(BaseModel):
@@ -31,10 +31,27 @@ class PopupConfig(BaseModel):
 
 
 class FocusItem(BaseModel):
-    """A single focus area and its clickable link selector for the card-feature spider."""
-    content: Optional[str] = None        # XPath of the region to screenshot / interact with
+    """
+    A single focus area for the card-feature spider.
+
+    With `link`, every matching link inside each `content` element is clicked
+    and the outcome captured. Without `link`, each `content` element is
+    captured as it is.
+    """
+    content: Optional[str] = None        # XPath of the region to interact with or capture
     link: Optional[str] = None           # XPath of links inside that region to click through
     popup: Optional[PopupConfig] = None  # Set only if clicking links in this area opens a popup
+    page_focus: Optional[list["FocusItem"]] = None # Focus areas applied to the page a link opens (new tab or redirect), replacing its full-page screenshot. One level only.
+
+    @model_validator(mode="after")
+    def _check_page_focus(self) -> "FocusItem":
+        if not self.page_focus:
+            return self
+        if not self.link:
+            raise ValueError("page_focus needs a link: it applies to the page a link opens.")
+        if any(item.page_focus for item in self.page_focus):
+            raise ValueError("page_focus cannot be nested: it is limited to one level.")
+        return self
 
 
 class FeatureConfig(BaseModel):
